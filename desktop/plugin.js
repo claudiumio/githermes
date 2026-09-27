@@ -403,6 +403,12 @@ const WORKSPACE_KEY = 'github'
 const WORKSPACE_PANE_ID = `plugin-workspace:${WORKSPACE_KEY}`
 let paneRender = null
 let paneClose = null
+// Whether the USER left the pane open, so app launch / plugin reload restores
+// that instead of force-opening the pane on every load.
+const OPEN_KEY = 'githermes.paneOpen.v1'
+let disposing = false
+const rememberOpen = open => { try { localStorage.setItem(OPEN_KEY, open ? '1' : '0') } catch {} }
+const wasLeftOpen = () => { try { return localStorage.getItem(OPEN_KEY) === '1' } catch { return false } }
 
 const usesWorkspaceTile = () => typeof host.openWorkspace === 'function'
 
@@ -453,10 +459,12 @@ function openGithubPane() {
         minWidth: '320px',
         onClose: () => {
           paneClose = null
+          if (!disposing) rememberOpen(false)
         },
         render: () => paneRender(),
         title: 'GitHub'
       })
+      rememberOpen(true)
 
       return
     } catch {
@@ -473,6 +481,7 @@ function collapseGithubPane() {
   const close = paneClose
 
   paneClose = null
+  if (!disposing) rememberOpen(false)
 
   try {
     close?.()
@@ -3760,11 +3769,17 @@ export default {
     // `ctx.register`, so this plugin's own lifecycle is what tears the tile down:
     // without it, disable / reload / hot-save leaves a zombie GitHub tab behind.
     if (typeof ctx.onDispose === 'function') {
-      ctx.onDispose(collapseGithubPane)
+      // Unload teardown is not the user closing the pane: keep the remembered
+      // open/closed state so the next load restores it.
+      ctx.onDispose(() => {
+        disposing = true
+        try { collapseGithubPane() } finally { disposing = false }
+      })
     }
 
     if (typeof host.openWorkspace === 'function') {
-      openGithubPane()
+      // Restore the user's last choice; never force the pane open on load.
+      if (wasLeftOpen()) openGithubPane()
     } else {
       ctx.register({
         id: 'pane',

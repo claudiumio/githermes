@@ -74,7 +74,10 @@ test('Collapsible pane: registration state is not treated as on-screen truth', (
   assert.ok(open.includes('host.revealPane(WORKSPACE_PANE_ID)'), 'hidden tiles must be fronted')
   // openWorkspace registers outside ctx.register, so the plugin must tear its
   // own tile down on unload / disable / hot-save.
-  assert.ok(source.includes('ctx.onDispose(collapseGithubPane)'))
+  assert.ok(/ctx\.onDispose\(\(\) => \{\s*disposing = true\s*try \{ collapseGithubPane\(\) \}/.test(source),
+    'unload must tear the tile down (without recording it as a user close)')
+  // Load restores the user's last choice instead of force-opening the pane.
+  assert.ok(source.includes('if (wasLeftOpen()) openGithubPane()'))
   assert.ok(!source.includes('function paneIsOpen()'))
 })
 
