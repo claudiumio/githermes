@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { parseGithubLink, linkNavigationPlan, shouldInterceptClick } from '../desktop/plugin.js'
+import { parseGithubLink, linkNavigationPlan, shouldInterceptClick, resolveRepoReset } from '../desktop/plugin.js'
 
 test('parseGithubLink maps PR / issue / repo links and rejects everything else', () => {
   const cases = [
@@ -39,4 +39,24 @@ test('modifier and non-primary clicks are left to the browser', () => {
   for (const k of ['metaKey', 'ctrlKey', 'shiftKey', 'altKey']) assert.equal(shouldInterceptClick({ ...base, [k]: true }), false, k)
   assert.equal(shouldInterceptClick({ ...base, button: 1 }), false)
   assert.equal(shouldInterceptClick({ ...base, defaultPrevented: true }), false)
+})
+
+test('a cross-repo link keeps its selection once, then a later return to that repo resets', () => {
+  // Pane and page each run the repo-change effect for the same commit.
+  const commit = (armed, repo) => {
+    const pane = resolveRepoReset(armed, repo)
+    const page = resolveRepoReset(pane.armed, repo)
+    assert.equal(pane.keepSelection, page.keepSelection, 'pane and page agree')
+    return page
+  }
+  let armed = 'b/b' // chat link from a/a to b/b PR arms the target
+  let r = commit(armed, 'b/b')
+  assert.equal(r.keepSelection, true, 'the link navigation keeps the linked PR')
+  armed = r.armed
+  r = commit(armed, 'a/a') // picker back to a/a
+  assert.equal(r.keepSelection, false)
+  assert.equal(r.armed, null, 'a non-matching change disarms the flag')
+  armed = r.armed
+  r = commit(armed, 'b/b') // picker / auto-follow back to b/b
+  assert.equal(r.keepSelection, false, "must not carry a/a's PR number into b/b")
 })
