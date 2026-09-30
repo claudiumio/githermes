@@ -1108,19 +1108,84 @@ const {
   selIssue: $selIssue,
 } = githubShellStore
 
-// Cross-repo "open session PR" navigation sets repo + selection together; the
-// repo-change reset below would otherwise clear the just-set selection after
-// the batched commit. The flag names the navigation target repo, armed only
-// when the repo actually changes. The effect matches instead of consuming: a
-// fresh mount never fires (so nothing goes stale), and pane+page each skip
-// the same commit independently. Any other repo change mismatches and clears.
+// Cross-repo navigation (session PR, chat link) sets repo + selection
+// together; the repo-change reset below would otherwise clear the just-set
+// selection after the batched commit. The flag names the navigation target
+// repo, armed only when the repo actually changes. The effect matches instead
+// of consuming, so pane+page each skip the same commit independently. The
+// first repo change that does NOT match disarms it, so a later return to that
+// repo (picker, auto-follow) resets like any other repo change.
 let suppressRepoResetFor = null
+
+export function resolveRepoReset(armed, repo) {
+  return armed === repo ? { keepSelection: true, armed } : { keepSelection: false, armed: null }
+}
 function navigateToSessionPr(repo, number) {
   if (repo && repo !== $repo.get()) suppressRepoResetFor = repo
   if (repo) $repo.set(repo)
   $tab.set('prs')
   $selPr.set(number)
   $selIssue.set(null)
+}
+
+// Chat link interception: a github.com PR / issue / repo link clicked in the
+// conversation opens in this plugin instead of the external browser.
+// Modifier / middle clicks still go to the website. Toggle: palette
+// "GitHub: Open chat links in pane" (stored as `interceptChatLinks`).
+const RESERVED_OWNERS = new Set(['orgs', 'settings', 'marketplace', 'features', 'topics', 'collections', 'sponsors', 'login', 'notifications', 'explore', 'search', 'apps', 'about', 'pricing'])
+
+export function parseGithubLink(href) {
+  let u
+  try { u = new URL(href) } catch { return null }
+  if (!/^(www\.)?github\.com$/i.test(u.hostname)) return null
+  const [owner, name, kind, num] = u.pathname.split('/').filter(Boolean)
+  if (!owner || !name || RESERVED_OWNERS.has(owner.toLowerCase())) return null
+  const repo = `${owner}/${name.replace(/\.git$/i, '')}`
+  if (!repoOk(repo)) return null
+  if (!kind) return { repo, kind: 'repo' }
+  const n = Number(num)
+  if (kind === 'pull' && Number.isInteger(n) && n > 0) return { repo, kind: 'pr', number: n }
+  if (kind === 'issues' && Number.isInteger(n) && n > 0) return { repo, kind: 'issue', number: n }
+  if (kind === 'pulls' && !num) return { repo, kind: 'prs' }
+  if (kind === 'issues' && !num) return { repo, kind: 'issues' }
+  return null // blobs, commits, actions… keep opening on the website
+}
+
+export function linkNavigationPlan(link) {
+  if (link.kind === 'pr') return { tab: 'prs', selPr: link.number, selIssue: null }
+  if (link.kind === 'issue') return { tab: 'issues', selPr: null, selIssue: link.number }
+  return { tab: link.kind === 'issues' ? 'issues' : 'prs', selPr: null, selIssue: null }
+}
+
+export function shouldInterceptClick(event) {
+  return !event.defaultPrevented && event.button === 0 &&
+    !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey
+}
+
+let interceptChatLinks = true
+
+function navigateToGithubLink(link) {
+  const plan = linkNavigationPlan(link)
+  if (link.repo !== $repo.get()) suppressRepoResetFor = link.repo
+  $repo.set(link.repo)
+  $tab.set(plan.tab)
+  $selPr.set(plan.selPr)
+  $selIssue.set(plan.selIssue)
+}
+
+function onChatLinkClick(event) {
+  if (!interceptChatLinks || !shouldInterceptClick(event)) return
+  const target = event.target instanceof Element ? event.target : null
+  const a = target?.closest('a[href]')
+  // Only links inside the conversation (assistant-ui message roots), never
+  // this plugin's own pane/page or app chrome.
+  if (!a || !a.closest('[data-slot^="aui_"]') || a.closest('.githermes-pane')) return
+  const link = parseGithubLink(a.getAttribute('href') || '')
+  if (!link) return
+  event.preventDefault()
+  event.stopImmediatePropagation()
+  navigateToGithubLink(link)
+  openGithubPane()
 }
 
 function useRepos() {
@@ -3473,12 +3538,14 @@ function useGitHubShellState() {
   const prevRepo = useRef(repo)
   useEffect(() => {
     if (prevRepo.current !== repo) {
-      // A cross-repo session-PR navigation sets the selection together with
-      // the repo (navigateToSessionPr); keep that selection, clear anything
+      // A cross-repo navigation (navigateToSessionPr / navigateToGithubLink)
+      // sets the selection together with the repo; keep that selection, clear anything
       // else. The filter always resets: it is shared across repos, so repo
       // A's query must never follow the user into repo B.
       $listQuery.set('')
-      if (suppressRepoResetFor !== repo) { $selPr.set(null); $selIssue.set(null) }
+      const reset = resolveRepoReset(suppressRepoResetFor, repo)
+      suppressRepoResetFor = reset.armed
+      if (!reset.keepSelection) { $selPr.set(null); $selIssue.set(null) }
     }
     prevRepo.current = repo
   }, [repo])
@@ -3654,6 +3721,9 @@ export default {
     resolveBash()
     const saved = ctx.storage.get('repo')
     if (saved) $repo.set(saved)
+    interceptChatLinks = ctx.storage.get('interceptChatLinks', true) !== false
+    window.addEventListener('click', onChatLinkClick, true)
+    ctx.onDispose?.(() => window.removeEventListener('click', onChatLinkClick, true))
     const assignments = ctx.storage.get('botAssignments', {})
     if (assignments && typeof assignments === 'object' && !Array.isArray(assignments)) $botAssignments.set(assignments)
 
@@ -3703,6 +3773,20 @@ export default {
       id: 'palette-page',
       area: PALETTE_AREA,
       data: { id: 'githermes.open-page', label: 'GitHub: Open page', keywords: ['github', 'page', 'pr', 'issue'], run: openGithubPage },
+    })
+    ctx.register({
+      id: 'palette-chat-links',
+      area: PALETTE_AREA,
+      data: {
+        id: 'githermes.toggle-chat-links',
+        label: 'GitHub: Toggle opening chat links in pane',
+        keywords: ['github', 'link', 'chat', 'intercept', 'browser'],
+        run: () => {
+          interceptChatLinks = !interceptChatLinks
+          ctx.storage.set('interceptChatLinks', interceptChatLinks)
+          host.notify?.({ kind: 'info', message: interceptChatLinks ? 'GitHub links in chat open in the pane' : 'GitHub links in chat open in the browser' })
+        },
+      },
     })
     ctx.register({ id: 'titlebar-github', area: TITLEBAR_AREAS.right, order: 20, render: () => jsx(TitlebarGithubButton, {}) })
     ctx.register({ id: 'statusbar-session-branch', area: STATUSBAR_AREAS.right, order: 84, render: () => jsx(SessionBranchStatus, {}) })
