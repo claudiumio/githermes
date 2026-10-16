@@ -94,6 +94,16 @@ test('Issue #29: Markdown parsing is memoized at the component top level', () =>
   assert.ok(composer.includes("blocks: previewBlocks, keyPrefix: 'preview'"))
 })
 
+test('Issue #109: the alert callout paints the theme surface, ordinary quotes stay flat', () => {
+  const view = source.slice(source.indexOf('function MdBlocksView'), source.indexOf('function MdBody'))
+  const quote = view.slice(view.indexOf("if (b.t === 'quote')"), view.indexOf("if (b.t === 'table')"))
+  assert.ok(quote.includes("backgroundColor: 'var(--ui-bg-quaternary)'"), 'alert must paint the themed surface token, not stay transparent')
+  assert.ok(quote.includes('rounded-md px-3 py-2'), 'alert needs the padded rounded box')
+  const plain = quote.split('\n').find(l => l.includes('if (!a) return')) || ''
+  assert.ok(plain.includes('border-(--ui-stroke-secondary) pl-3 text-(--ui-text-tertiary)'), 'ordinary blockquote keeps its flat left-rule style')
+  assert.ok(!plain.includes('backgroundColor'), 'ordinary blockquote must not gain the alert background')
+})
+
 test('Issue #29: timeline assembly is memoized before detail early returns', () => {
   const detail = source.slice(source.indexOf('function PrDetail'), source.indexOf('function IssueDetail'))
   const memo = detail.indexOf('const timeline = useMemo(() => assembleTimeline(')

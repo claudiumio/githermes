@@ -536,6 +536,52 @@ test('mdBlocks parses GFM markdown into structured AST blocks', () => {
   assert.equal(blocks[1].text, 'const x = 1')
 })
 
+test('Issue #109: mdBlocks detects GitHub alert markers on the quote first line', () => {
+  for (const kind of ['NOTE', 'TIP', 'IMPORTANT', 'WARNING', 'CAUTION']) {
+    const blocks = mdBlocks(`> [!${kind}]\n> body text`)
+    assert.deepEqual(blocks, [
+      { t: 'quote', alert: kind.toLowerCase(), children: [{ t: 'p', text: 'body text' }] },
+    ])
+  }
+})
+
+test('Issue #109: alert marker matching is case-insensitive', () => {
+  assert.equal(mdBlocks('> [!note]\n> hi')[0].alert, 'note')
+  assert.equal(mdBlocks('> [!Warning]\n> hi')[0].alert, 'warning')
+  assert.deepEqual(mdBlocks('> [!TIP]\r\n> hi'), [{ t: 'quote', alert: 'tip', children: [{ t: 'p', text: 'hi' }] }])
+  assert.deepEqual(mdBlocks('> [!NOTE]'), [{ t: 'quote', alert: 'note', children: [] }])
+})
+
+test('Issue #109: stripping the marker leaves the real alert body intact', () => {
+  const body = "🤖 This comment was written by Claudio's Hermes (AI assistant), posting on Claudio's behalf."
+  const blocks = mdBlocks(`> [!NOTE]\n> ${body}`)
+  assert.equal(blocks[0].alert, 'note')
+  assert.deepEqual(blocks[0].children, [{ t: 'p', text: body }])
+})
+
+test('Issue #109: only an exact lone marker on the first line counts', () => {
+  assert.deepEqual(mdBlocks('> [!FOO]\n> text'), [{ t: 'quote', children: [{ t: 'p', text: '[!FOO]\ntext' }] }])
+  assert.deepEqual(mdBlocks('> lead\n> [!NOTE]'), [{ t: 'quote', children: [{ t: 'p', text: 'lead\n[!NOTE]' }] }])
+  assert.deepEqual(mdBlocks('> [!NOTE] extra\n> text'), [{ t: 'quote', children: [{ t: 'p', text: '[!NOTE] extra\ntext' }] }])
+  assert.deepEqual(mdBlocks('> see [!NOTE]\n> text'), [{ t: 'quote', children: [{ t: 'p', text: 'see [!NOTE]\ntext' }] }])
+})
+
+test('Issue #109: ordinary quotes keep the exact pre-existing shape', () => {
+  assert.deepEqual(mdBlocks('> plain quote'), [{ t: 'quote', children: [{ t: 'p', text: 'plain quote' }] }])
+  assert.deepEqual(mdBlocks('>'), [{ t: 'quote', children: [] }])
+})
+
+test('Issue #109: an alert keeps nested block content after the marker', () => {
+  const md = ['> [!WARNING]', '> Heads up:', '>', '> - one', '> - two', '>', '> > nested quote'].join('\n')
+  const blocks = mdBlocks(md)
+  assert.equal(blocks[0].alert, 'warning')
+  assert.deepEqual(blocks[0].children, [
+    { t: 'p', text: 'Heads up:' },
+    { t: 'ul', items: [{ text: 'one' }, { text: 'two' }] },
+    { t: 'quote', children: [{ t: 'p', text: 'nested quote' }] },
+  ])
+})
+
 test('Issue #24: repoOk accepts owner/repo, rejects shell-hostile free text', () => {
   // Valid
   assert.ok(repoOk('claudioorjunior/githermes'))
