@@ -605,21 +605,33 @@ function resolveBash() {
   bashReady = (async () => {
     if (POSIX_SHELL) return
     try {
-      const r = await host.request('shell.exec', { command: 'where git' })
-      const git = (r.stdout || '').split(/\r?\n/).map(s => s.trim()).filter(Boolean)[0]
-      if (!git) return
-      const normalizedGit = git.replace(/\\/g, '/')
-      // <root>/cmd/git.exe | <root>/mingw64/bin/git.exe -> <root>/bin/bash.exe
-      const m = normalizedGit.match(/^(.*)\/(?:cmd|mingw64\/bin|usr\/bin)\/[^/]+$/i)
-      const root = m ? m[1] : normalizedGit.replace(/\/[^/]+$/, '')
-      for (const candidate of [`${root}\\bin\\bash.exe`, `${root}\\usr\\bin\\bash.exe`]) {
-        const probe = await host.request('shell.exec', { command: `if exist "${candidate}" echo FOUND` })
-        if ((probe.stdout || '').includes('FOUND')) {
-          bashPath = candidate
-          break
-        }
+      const savedRaw = (() => { try { return localStorage.getItem('githermes.bashPath') } catch { return null } })();
+      const saved = savedRaw ? savedRaw.replace(/\\/g, '/') : null
+      if (saved) {
+        bashPath = saved
+        return
       }
-    } catch { /* shellCommand's bash-not-found stub is the recovery path */ }
+    } catch {}
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        const r = await host.request('shell.exec', { command: 'where git' })
+        const git = (r.stdout || '').split(/\r?\n/).map(s => s.trim()).filter(Boolean)[0]
+        if (!git) continue
+        const normalizedGit = git.replace(/\\/g, '/')
+        const m = normalizedGit.match(/^(.*)\/(?:cmd|mingw64\/bin|usr\/bin)\/[^/]+$/i)
+        const root = m ? m[1] : normalizedGit.replace(/\/[^/]+$/, '')
+        for (const candidate of [`${root}\\bin\\bash.exe`, `${root}\\usr\\bin\\bash.exe`]) {
+          const probe = await host.request('shell.exec', { command: `if exist ${candidate} echo FOUND` })
+          if ((probe.stdout || '').includes('FOUND')) {
+            bashPath = candidate
+            try { localStorage.setItem('githermes.bashPath', bashPath ? bashPath.replace(/\//g, '\\') : '') } catch {}
+            return
+          }
+        }
+      } catch {
+        await new Promise(r => setTimeout(r, 200 * (attempt + 1)))
+      }
+    }
   })()
   return bashReady
 }
