@@ -1345,14 +1345,49 @@ function useAssignedIssues() {
 
 function InboxView() {
   const prsQ = useAssignedPrs()
-  const issuesQ = useAssignedIssues()
   const prs = Array.isArray(prsQ.data) ? prsQ.data : []
-  const issues = Array.isArray(issuesQ.data) ? issuesQ.data : []
+  const sectionClass = 'mb-5 pb-4 border-b border-(--ui-stroke-secondary) last:border-0 last:pb-0'
+  const subClass = 'text-[11px] text-(--ui-text-tertiary) leading-4 mt-0.5'
+  const countClass = 'text-[13px] font-semibold text-(--ui-text-secondary) tabular-nums shrink-0 w-6 text-right'
+  const titleClass = 'text-sm font-medium text-(--ui-text-primary) truncate'
+  const metaClass = 'text-[11px] text-(--ui-text-tertiary) truncate'
   return jsxs('div', { className: 'gh-list', children: [
-    jsx('h3', { className: 'gh-list-heading px-2 text-xs uppercase tracking-wider', children: 'Assigned PRs' }),
-    prs.length ? prs.map(p => jsx('a', { href: p.url || '', className: 'gh-list-row block px-2 py-2 text-sm hover:text-(--ui-accent)', children: [jsx('span', { className: 'font-medium', children: p.title || '' }), jsx('span', { className: 'text-[10px] text-(--ui-text-tertiary) ml-1', children: `#${p.number ?? ''}` })] }, p.number)) : jsx('p', { className: 'text-xs text-(--ui-text-tertiary) px-2', children: 'No assigned PRs.' }),
-    jsx('h3', { className: 'gh-list-heading px-2 mt-4 text-xs uppercase tracking-wider', children: 'Assigned Issues' }),
-    issues.length ? issues.map(i => jsx('a', { href: i.url || '', className: 'gh-list-row block px-2 py-2 text-sm hover:text-(--ui-accent)', children: [jsx('span', { className: 'font-medium', children: i.title || '' }), jsx('span', { className: 'text-[10px] text-(--ui-text-tertiary) ml-1', children: `#${i.number ?? ''}` })] }, i.number)) : jsx('p', { className: 'text-xs text-(--ui-text-tertiary) px-2', children: 'No assigned issues.' }),
+    // Needs your review
+    jsxs('section', { className: sectionClass, children: [
+      jsxs('div', { className: 'flex items-baseline gap-2 px-2 mb-1', children: [jsx('h3', { className: 'text-sm font-semibold text-(--ui-text-primary)', children: 'Needs your review' }), jsx('span', { className: countClass, children: '0' })] }),
+      jsx('p', { className: subClass + ' px-2', children: 'Pull requests that need your review will appear here.' }),
+      jsx('p', { className: subClass + ' px-2 italic', children: 'All caught up' }),
+    ] }),
+    // Needs your team's review
+    jsxs('section', { className: sectionClass, children: [
+      jsxs('div', { className: 'flex items-baseline gap-2 px-2 mb-1', children: [jsx('h3', { className: 'text-sm font-semibold text-(--ui-text-primary)', children: "Needs your team's review" }), jsx('span', { className: countClass, children: '0' })] }),
+      jsx('p', { className: subClass + ' px-2', children: "Pull requests that need your team's review will appear here." }),
+      jsx('p', { className: subClass + ' px-2 italic', children: 'All caught up' }),
+    ] }),
+    // Your drafts
+    jsxs('section', { className: sectionClass, children: [
+      jsxs('div', { className: 'flex items-baseline gap-2 px-2 mb-1', children: [jsx('h3', { className: 'text-sm font-semibold text-(--ui-text-primary)', children: 'Your drafts' }), jsx('span', { className: countClass, children: '0' })] }),
+      jsx('p', { className: subClass + ' px-2', children: 'Pull requests that you have started but not yet submitted for review will appear here.' }),
+      jsx('p', { className: subClass + ' px-2 italic', children: 'All caught up' }),
+    ] }),
+    // Waiting for review or checks (show assigned/open PRs here as closest match)
+    jsxs('section', { className: sectionClass, children: [
+      jsxs('div', { className: 'flex items-baseline gap-2 px-2 mb-1', children: [jsx('h3', { className: 'text-sm font-semibold text-(--ui-text-primary)', children: 'Waiting for review or checks' }), jsx('span', { className: countClass, children: String(prs.length || '0') })] }),
+      jsx('p', { className: subClass + ' px-2', children: 'Pull requests waiting for approval, failing checks, merge conflicts, or required changes.' }),
+      prs.length ? prs.map(p => jsxs('a', { href: p.url || '', className: 'gh-list-row block px-2 py-2 mt-2 rounded-md border border-(--ui-stroke-secondary) hover:border-(--ui-accent)', children: [jsxs('div', { className: 'flex items-center gap-2', children: [jsx('span', { className: titleClass, children: p.title || '' }), jsx('span', { className: metaClass, children: p.repository ? `${p.repository.name || p.repository}` : '' })] }), jsx('p', { className: metaClass, children: `#${p.number ?? ''} · Updated ${new Date(p.updatedAt || '').toLocaleDateString()}` })] }, p.number)) : jsx('p', { className: subClass + ' px-2 italic', children: 'All caught up' }),
+    ] }),
+    // Needs action
+    jsxs('section', { className: sectionClass, children: [
+      jsxs('div', { className: 'flex items-baseline gap-2 px-2 mb-1', children: [jsx('h3', { className: 'text-sm font-semibold text-(--ui-text-primary)', children: 'Needs action' }), jsx('span', { className: countClass, children: '0' })] }),
+      jsx('p', { className: subClass + ' px-2', children: 'Pull requests with failing checks, merge conflicts, outdated branches, or required changes will appear here.' }),
+      jsx('p', { className: subClass + ' px-2 italic', children: 'All caught up' }),
+    ] }),
+    // Ready to merge
+    jsxs('section', { className: sectionClass, children: [
+      jsxs('div', { className: 'flex items-baseline gap-2 px-2 mb-1', children: [jsx('h3', { className: 'text-sm font-semibold text-(--ui-text-primary)', children: 'Ready to merge' }), jsx('span', { className: countClass, children: '0' })] }),
+      jsx('p', { className: subClass + ' px-2', children: 'Pull requests that are ready to merge will appear here.' }),
+      jsx('p', { className: subClass + ' px-2 italic', children: 'All caught up' }),
+    ] }),
   ] })
 }
 
