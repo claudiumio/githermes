@@ -1319,7 +1319,7 @@ function useAssignedPrs() {
   return useQuery({
     queryKey: [ID, 'assigned-prs'],
     queryFn: async () => {
-      const out = await sh(`${GH} search prs --assignee @me --author @me --state open --limit 30 --json number,title,state,author,updatedAt,url,repository,headRefName,additions,deletions,changedFiles,reviewDecision,statusCheckRollup`)
+      const out = await sh(`${GH} search prs --author @me --state open --limit 30 --json number,title,state,author,updatedAt,url,repository`)
       try {
         const parsed = JSON.parse(out)
         return Array.isArray(parsed) ? parsed : []
