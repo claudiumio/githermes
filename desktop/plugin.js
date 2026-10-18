@@ -1394,6 +1394,32 @@ function useMentionedIssues() {
     staleTime: 60_000,
   })
 }
+function useNeedsActionPrs() {
+  return useQuery({
+    queryKey: [ID, 'needs-action-prs'],
+    staleTime: 60_000,
+    enabled: !!githubShellStore.repo.get(),
+    queryFn: async () => {
+      const r = githubShellStore.repo.get()
+      if (!r) return []
+      const out = await sh(`${GH} pr list --repo ${sq(r)} --state open --limit 30 --json number,title,state,author,updatedAt,url,repository,reviewDecision,statusCheckRollup`)
+      try { const parsed = JSON.parse(out); return Array.isArray(parsed) ? parsed.filter(p => (p.statusCheckRollup && ['FAILURE','ERROR','CANCELLED','TIMED_OUT','ACTION_REQUIRED','STARTUP_FAILURE','STALE'].includes(p.statusCheckRollup.bucket || p.statusCheckRollup.conclusion || '')) || (p.reviewDecision && ['CHANGES_REQUESTED','REVIEW_REQUIRED'].includes(p.reviewDecision)) : [] } catch { return [] }
+    },
+  })
+}
+function useReadyToMergePrs() {
+  return useQuery({
+    queryKey: [ID, 'ready-merge-prs'],
+    staleTime: 60_000,
+    enabled: !!githubShellStore.repo.get(),
+    queryFn: async () => {
+      const r = githubShellStore.repo.get()
+      if (!r) return []
+      const out = await sh(`${GH} pr list --repo ${sq(r)} --state open --limit 30 --json number,title,state,author,updatedAt,url,repository,reviewDecision,statusCheckRollup`)
+      try { const parsed = JSON.parse(out); return Array.isArray(parsed) ? parsed.filter(p => p.statusCheckRollup && p.statusCheckRollup.conclusion === 'SUCCESS') : [] } catch { return [] }
+    },
+  })
+}
 function useAssignedIssues() {
   return useQuery({
     queryKey: [ID, 'assigned-issues'],
@@ -1413,6 +1439,8 @@ function InboxView({ repo }) {
   const prs = Array.isArray(prsQ.data) ? prsQ.data : []
   const reviewReq = useReviewRequestedPrs(); const reviewReqList = Array.isArray(reviewReq.data) ? reviewReq.data : []
   const draftPrs = useDraftPrs(); const draftList = Array.isArray(draftPrs.data) ? draftPrs.data : []
+  const needsAction = useNeedsActionPrs(); const needsActionList = Array.isArray(needsAction.data) ? needsAction.data : []
+  const readyMerge = useReadyToMergePrs(); const readyMergeList = Array.isArray(readyMerge.data) ? readyMerge.data : []
   const sectionClass = 'mb-5 pb-4 border-b border-(--ui-stroke-secondary) last:border-0 last:pb-0'
   const subClass = 'text-[11px] text-(--ui-text-tertiary) leading-4 mt-0.5'
   const countClass = 'text-[13px] font-semibold text-(--ui-text-secondary) tabular-nums shrink-0 w-6 text-right'
@@ -1465,15 +1493,17 @@ function InboxView({ repo }) {
     ] }),
     // Needs action
     jsxs('section', { className: sectionClass, children: [
-      jsxs('div', { className: 'flex items-baseline gap-2 px-2 mb-1', children: [jsx('h3', { className: 'gh-list-heading text-[10px] font-semibold', children: [jsx(Codicon, { name: 'warning', size: 12 }), ' ', 'NEEDS ACTION'] }), jsx('span', { className: countClass, children: '0' })] }),
+      jsxs('div', { className: 'flex items-baseline gap-2 px-2 mb-1', children: [jsx('h3', { className: 'gh-list-heading text-[10px] font-semibold', children: [jsx(Codicon, { name: 'warning', size: 12 }), ' ', 'NEEDS ACTION'] }), jsx('span', { className: countClass, children: String(needsActionList.length || '0') })] }),
       jsx('p', { className: subClass + ' px-2', children: 'Pull requests with failing checks, merge conflicts, outdated branches, or required changes will appear here.' }),
-      jsx('p', { className: subClass + ' px-2 italic', children: 'All caught up' }),
+      jsx('p', { className: subClass + ' px-2 italic', children: needsActionList.length ? '' : 'No PRs need action right now.' }),
+    needsActionList.length ? needsActionList.map(p => jsxs('button', { type: 'button', onClick: () => navigateToSessionPr(p.repository ? (p.repository.nameWithOwner || (repo || '')) : (repo || ''), p.number), className: 'gh-list-row w-full text-left px-3 py-2.5 flex gap-2.5 items-start rounded-md hover:bg-(--ui-bg-quinary) border border-transparent hover:border-(--ui-stroke-secondary) bg-transparent block', children: [jsx('span', { className: 'mt-0.5', children: jsx(Codicon, { name: 'warning', size: 20, style: { color: 'var(--ui-green)' } }) }), jsxs('span', { className: 'min-w-0 flex-1', children: [jsx('span', { className: 'block text-sm font-medium truncate', children: p.title || '' }), jsxs('span', { className: 'text-[10px] text-(--ui-text-tertiary)', children: [`#${p.number ?? ''}`, ' · ', `Updated ${new Date(p.updatedAt || '').toLocaleDateString()}`] })] })] }, p.number)) : jsx('p', { className: subClass + ' px-2 italic', children: 'No PRs need action right now.' }),
     ] }),
     // Ready to merge
     jsxs('section', { className: sectionClass, children: [
-      jsxs('div', { className: 'flex items-baseline gap-2 px-2 mb-1', children: [jsx('h3', { className: 'gh-list-heading text-[10px] font-semibold', children: [jsx(Codicon, { name: 'git-merge', size: 12 }), ' ', 'READY TO MERGE'] }), jsx('span', { className: countClass, children: '0' })] }),
+      jsxs('div', { className: 'flex items-baseline gap-2 px-2 mb-1', children: [jsx('h3', { className: 'gh-list-heading text-[10px] font-semibold', children: [jsx(Codicon, { name: 'git-merge', size: 12 }), ' ', 'READY TO MERGE'] }), jsx('span', { className: countClass, children: String(readyMergeList.length || '0') })] }),
       jsx('p', { className: subClass + ' px-2', children: 'Pull requests that are ready to merge will appear here.' }),
-      jsx('p', { className: subClass + ' px-2 italic', children: 'All caught up' }),
+      jsx('p', { className: subClass + ' px-2 italic', children: readyMergeList.length ? '' : 'No PRs ready to merge.' }),
+      readyMergeList.length ? readyMergeList.map(p => jsxs('button', { type: 'button', onClick: () => navigateToSessionPr(p.repository ? (p.repository.nameWithOwner || (repo || '')) : (repo || ''), p.number), className: 'gh-list-row w-full text-left px-3 py-2.5 flex gap-2.5 items-start rounded-md hover:bg-(--ui-bg-quinary) border border-transparent hover:border-(--ui-stroke-secondary) bg-transparent block', children: [jsx('span', { className: 'mt-0.5', children: jsx(Codicon, { name: 'git-merge', size: 20, style: { color: 'var(--ui-green)' } }) }), jsxs('span', { className: 'min-w-0 flex-1', children: [jsx('span', { className: 'block text-sm font-medium truncate', children: p.title || '' }), jsxs('span', { className: 'text-[10px] text-(--ui-text-tertiary)', children: [`#${p.number ?? ''}`, ' · ', `Updated ${new Date(p.updatedAt || '').toLocaleDateString()}`] })] })] }, p.number)) : jsx('p', { className: subClass + ' px-2 italic', children: 'No PRs ready to merge.' }),
     ] }),
   ] }) })
 }
