@@ -1403,7 +1403,7 @@ function useNeedsActionPrs() {
       const r = githubShellStore.repo.get()
       if (!r) return []
       const out = await sh(`${GH} pr list --repo ${sq(r)} --state open --limit 30 --json number,title,state,author,updatedAt,url,repository,reviewDecision,statusCheckRollup`)
-      try { const parsed = JSON.parse(out); return Array.isArray(parsed) ? parsed.filter(p => (p.statusCheckRollup && ['FAILURE','ERROR','CANCELLED','TIMED_OUT','ACTION_REQUIRED','STARTUP_FAILURE','STALE'].includes(p.statusCheckRollup.bucket || p.statusCheckRollup.conclusion || '')) || (p.reviewDecision && ['CHANGES_REQUESTED','REVIEW_REQUIRED'].includes(p.reviewDecision)) : [] } catch { return [] }
+      try { const parsed = JSON.parse(out); if (!Array.isArray(parsed)) return []; const failures = new Set(['FAILURE','ERROR','CANCELLED','TIMED_OUT','ACTION_REQUIRED','STARTUP_FAILURE','STALE']); const reviewActions = new Set(['CHANGES_REQUESTED','REVIEW_REQUIRED']); return parsed.filter(p => (p.statusCheckRollup && (failures.has(p.statusCheckRollup.bucket || '') || failures.has(p.statusCheckRollup.conclusion || '')) || (p.reviewDecision && reviewActions.has(p.reviewDecision)))) } catch { return [] }
     },
   })
 }
