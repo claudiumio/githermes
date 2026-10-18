@@ -1357,6 +1357,18 @@ function useRecentIssues() {
   })
 }
 
+function useMentionedIssues() {
+  return useQuery({
+    queryKey: [ID, 'mentioned-issues'],
+    queryFn: async () => {
+      try {
+        const out = await sh(`${GH} search issues --search "involves:@me" --state open --limit 5 --json number,title,state,author,updatedAt,url,repository`)
+        try { const parsed = JSON.parse(out); return Array.isArray(parsed) ? parsed : [] } catch { return [] }
+      } catch { return [] }
+    },
+    staleTime: 60_000,
+  })
+}
 function useAssignedIssues() {
   return useQuery({
     queryKey: [ID, 'assigned-issues'],
@@ -1382,25 +1394,25 @@ function InboxView({ repo }) {
   return jsxs('div', { className: 'gh-list', children: [
     // Needs your review
     jsxs('section', { className: sectionClass, children: [
-      jsxs('div', { className: 'gh-list-heading flex items-center gap-1.5 px-2 mb-1 text-[10px] font-semibold', children: [jsx(Codicon, { name: 'git-pull-request', size: 12 }), jsx('span', { children: 'Needs your review' }), jsx('span', { className: 'font-normal text-(--ui-text-quaternary)', children: 'Pull requests' }), jsx('span', { className: countClass, children: '0' })] }),
+      jsxs('div', { className: 'gh-list-heading flex items-center gap-1.5 px-2 mb-1 text-[10px] font-semibold', children: [jsx(Codicon, { name: 'git-pull-request', size: 12 }), 'NEEDS YOUR REVIEW', jsx('span', { className: countClass, children: '0' })] }),
       jsx('p', { className: subClass + ' px-2', children: 'Pull requests that need your review will appear here.' }),
       jsx('p', { className: subClass + ' px-2 italic', children: 'All caught up' }),
     ] }),
     // Needs your team's review
     jsxs('section', { className: sectionClass, children: [
-      jsxs('div', { className: 'flex items-baseline gap-2 px-2 mb-1', children: [jsx('h3', { className: 'text-sm font-semibold text-(--ui-text-primary)', children: "Needs your team's review" }), jsx('span', { className: countClass, children: '0' })] }),
+      jsxs('div', { className: 'flex items-baseline gap-2 px-2 mb-1', children: [jsx('h3', { className: 'gh-list-heading text-[10px] font-semibold uppercase tracking-wide', children: [jsx(Codicon, { name: 'git-pull-request', size: 12 }), "NEEDS YOUR TEAM'S REVIEW"] }), jsx('span', { className: countClass, children: '0' })] }),
       jsx('p', { className: subClass + ' px-2', children: "Pull requests that need your team's review will appear here." }),
       jsx('p', { className: subClass + ' px-2 italic', children: 'All caught up' }),
     ] }),
     // Your drafts
     jsxs('section', { className: sectionClass, children: [
-      jsxs('div', { className: 'flex items-baseline gap-2 px-2 mb-1', children: [jsx('h3', { className: 'gh-list-heading text-[10px] font-semibold', children: [jsx(Codicon, { name: 'git-pull-request-draft', size: 12 }), 'Your drafts'] }), jsx('span', { className: countClass, children: '0' })] }),
+      jsxs('div', { className: 'flex items-baseline gap-2 px-2 mb-1', children: [jsx('h3', { className: 'gh-list-heading text-[10px] font-semibold', children: [jsx(Codicon, { name: 'git-pull-request-draft', size: 12 }), ' ', 'YOUR DRAFTS'] }), jsx('span', { className: countClass, children: '0' })] }),
       jsx('p', { className: subClass + ' px-2', children: 'Pull requests that you have started but not yet submitted for review will appear here.' }),
       jsx('p', { className: subClass + ' px-2 italic', children: 'All caught up' }),
     ] }),
     // Waiting for review or checks (show assigned/open PRs here as closest match)
     jsxs('section', { className: sectionClass, children: [
-      jsxs('div', { className: 'flex items-baseline gap-2 px-2 mb-1', children: [jsx('h3', { className: 'gh-list-heading text-[10px] font-semibold', children: [jsx(Codicon, { name: 'git-pull-request', size: 12 }), 'Waiting for review or checks'] }), jsx('span', { className: countClass, children: String(prs.length || '0') })] }),
+      jsxs('div', { className: 'flex items-baseline gap-2 px-2 mb-1', children: [jsx('h3', { className: 'gh-list-heading text-[10px] font-semibold', children: [jsx(Codicon, { name: 'git-pull-request', size: 12 }), ' ', 'Waiting for review or checks'] }), jsx('span', { className: countClass, children: String(prs.length || '0') })] }),
       jsx('p', { className: subClass + ' px-2', children: 'Pull requests waiting for approval, failing checks, merge conflicts, or required changes.' }),
       prs.length ? prs.map(p => {
         const prRepo = (p.repository && p.repository.nameWithOwner) ? p.repository.nameWithOwner : (repo || '')
@@ -1426,13 +1438,13 @@ function InboxView({ repo }) {
     ] }),
     // Needs action
     jsxs('section', { className: sectionClass, children: [
-      jsxs('div', { className: 'flex items-baseline gap-2 px-2 mb-1', children: [jsx('h3', { className: 'gh-list-heading text-[10px] font-semibold', children: [jsx(Codicon, { name: 'warning', size: 12 }), 'Needs action'] }), jsx('span', { className: countClass, children: '0' })] }),
+      jsxs('div', { className: 'flex items-baseline gap-2 px-2 mb-1', children: [jsx('h3', { className: 'gh-list-heading text-[10px] font-semibold', children: [jsx(Codicon, { name: 'warning', size: 12 }), ' ', 'NEEDS ACTION'] }), jsx('span', { className: countClass, children: '0' })] }),
       jsx('p', { className: subClass + ' px-2', children: 'Pull requests with failing checks, merge conflicts, outdated branches, or required changes will appear here.' }),
       jsx('p', { className: subClass + ' px-2 italic', children: 'All caught up' }),
     ] }),
     // Ready to merge
     jsxs('section', { className: sectionClass, children: [
-      jsxs('div', { className: 'flex items-baseline gap-2 px-2 mb-1', children: [jsx('h3', { className: 'gh-list-heading text-[10px] font-semibold', children: [jsx(Codicon, { name: 'git-merge', size: 12 }), 'Ready to merge'] }), jsx('span', { className: countClass, children: '0' })] }),
+      jsxs('div', { className: 'flex items-baseline gap-2 px-2 mb-1', children: [jsx('h3', { className: 'gh-list-heading text-[10px] font-semibold', children: [jsx(Codicon, { name: 'git-merge', size: 12 }), ' ', 'READY TO MERGE'] }), jsx('span', { className: countClass, children: '0' })] }),
       jsx('p', { className: subClass + ' px-2', children: 'Pull requests that are ready to merge will appear here.' }),
       jsx('p', { className: subClass + ' px-2 italic', children: 'All caught up' }),
     ] }),
@@ -1449,6 +1461,7 @@ function AllIssuesView({ repo }) {
   const subClass = 'text-[11px] text-(--ui-text-tertiary) leading-4 mt-0.5'
   const countClass = 'text-[13px] font-semibold text-(--ui-text-secondary) tabular-nums shrink-0 w-6 text-right'
   const sectionClass = 'mb-5'
+  const mentioned = useMentionedIssues(); const mentionedList = Array.isArray(mentioned.data) ? mentioned.data : []
   return jsxs('div', { className: 'gh-list', children: [
     jsxs('section', { className: 'mb-2', children: [jsx('h2', { className: 'text-base font-bold text-(--ui-text-primary) px-2 mb-3', children: 'All Issues' })] }),
     jsxs('div', { className: 'mb-5', children: [jsxs('div', { className: 'flex items-baseline gap-2 px-2 mb-1', children: [jsx('h3', { className: 'text-sm font-semibold text-(--ui-text-primary)', children: [jsx(Codicon, { name: 'issues', size: 12 }), 'Assigned to you'] }), jsx('span', { className: countClass, children: String(assignedList.length || '0') })] }), assignedList.length ? assignedList.map(i => jsxs('button', { type: 'button', onClick: () => navigateToSessionIssue((i.repository && i.repository.nameWithOwner) ? i.repository.nameWithOwner : (repo || ''), i.number), className: 'gh-list-row w-full text-left px-3 py-2.5 flex gap-2.5 items-start rounded-md hover:bg-(--ui-bg-quinary) border border-transparent hover:border-(--ui-stroke-secondary) bg-transparent block', children: [jsx('span', { className: 'mt-0.5', children: jsx(Codicon, { name: 'issues', size: 20, style: { color: 'var(--ui-green)' } }) }), jsxs('span', { className: 'min-w-0 flex-1', children: [jsx('span', { className: 'block text-sm font-medium truncate', children: i.title || '' }), jsxs('span', { className: 'text-[10px] text-(--ui-text-tertiary)', children: [`#${i.number ?? ''}`, ' · ', `Updated ${new Date(i.updatedAt || '').toLocaleDateString()}`] })] })] }, i.number)) : jsx('p', { className: subClass + ' px-2', children: 'No assigned issues.' })] }),
