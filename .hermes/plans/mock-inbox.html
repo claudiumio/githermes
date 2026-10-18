@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>Inbox wireframe</title>
+<style>
+:root{--ui-bg:#0d1117;--ui-stroke:#30363d;--ui-text:#c9d1d9;--accent:#58a6ff;--green:#3fb950;--red:#f85149;--yellow:#d29922}
+*{box-sizing:border-box;font-family:system-ui,sans-serif}
+body{margin:0;background:var(--ui-bg);color:var(--ui-text);padding:24px}
+.container{max-width:720px;margin:0 auto}
+header{display:flex;align-items:center;gap:12px;margin-bottom:24px}
+.badge{background:var(--green);color:#fff;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:600}
+.tabs{display:flex;gap:8px;margin-bottom:16px;border-bottom:1px solid var(--ui-stroke);padding-bottom:8px}
+.tab{background:transparent;border:0;color:var(--ui-text);cursor:pointer;padding:6px 12px;border-radius:6px;font-size:13px}
+.tab.active{background:rgba(88,166,255,0.12);color:var(--accent);border:1px solid var(--accent)}
+.card{border:1px solid var(--ui-stroke);border-radius:12px;padding:16px;margin-bottom:12px;background:rgba(255,255,255,0.02)}
+.card h3{margin:0 0 4px;font-size:14px;color:var(--ui-text)}
+.card p{margin:0;font-size:12px;color:#8b949e}
+.row{display:flex;justify-content:space-between;align-items:center;gap:12px}
+.chip{font-size:10px;padding:2px 6px;border-radius:999px;border:1px solid var(--ui-stroke);background:rgba(255,255,255,0.05)}
+</style></head><body>
+<div class="container">
+<header><h2>GitHub Inbox</h2><span class="badge">New</span></header>
+<div class="tabs">
+<button class="tab active">Assigned PRs</button>
+<button class="tab">Assigned Issues</button>
+<button class="tab">Drafts</button>
+</div>
+<div class="card"><div class="row"><h3>cli/cli #4821 · fix: resolve bash on cold start</h3><span class="chip">3 comments</span></div><p>Assigned 2h ago · open</p></div>
+<div class="card"><div class="row"><h3>cli/cli #4789 · docs: update plugin install guide</h3><span class="chip">1 review</span></div><p>Assigned yesterday · open</p></div>
+</div>
+</body></html>
