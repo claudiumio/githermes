@@ -1315,6 +1315,34 @@ function useRepos() {
   })
 }
 
+function useAssignedPrs() {
+  return useQuery({
+    queryKey: [ID, 'assigned-prs'],
+    queryFn: async () => {
+      const out = await sh(`${GH} search prs --assignee @me --state open --limit 30 --json number,title,state,author,updatedAt,url,repository`)
+      try {
+        const parsed = JSON.parse(out)
+        return Array.isArray(parsed) ? parsed : []
+      } catch { return [] }
+    },
+    staleTime: 60_000,
+  })
+}
+
+function useAssignedIssues() {
+  return useQuery({
+    queryKey: [ID, 'assigned-issues'],
+    queryFn: async () => {
+      const out = await sh(`${GH} search issues --assignee @me --state open --limit 30 --json number,title,state,author,updatedAt,url,repository`)
+      try {
+        const parsed = JSON.parse(out)
+        return Array.isArray(parsed) ? parsed : []
+      } catch { return [] }
+    },
+    staleTime: 60_000,
+  })
+}
+
 // Behind count only changes after new data arrives, so the updater polls.
 // Non-numeric output (missing compare, no revision) means "not behind".
 export function parseBehindCount(raw) {
