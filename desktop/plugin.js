@@ -1429,18 +1429,25 @@ function InboxView({ repo }) {
       jsx('p', { className: subClass + ' px-2', children: 'Pull requests that are ready to merge will appear here.' }),
       jsx('p', { className: subClass + ' px-2 italic', children: 'All caught up' }),
     ] }),
-    // All Issues — categories from github.com/issues paths
-    jsxs('section', { className: 'mt-8 mb-5 pb-4 border-t-2 border-(--ui-stroke-secondary)', children: [
-      jsx('h2', { className: 'text-base font-bold text-(--ui-text-primary) px-2 mb-3', children: 'All Issues' }),
-      // Assigned
-      (() => { const issues = useAssignedIssues(); const list = Array.isArray(issues.data) ? issues.data : []; return jsxs('div', { className: 'mb-5', children: [jsxs('div', { className: 'flex items-baseline gap-2 px-2 mb-1', children: [jsx('h3', { className: 'text-sm font-semibold text-(--ui-text-primary)', children: 'Assigned to you' }), jsx('span', { className: countClass, children: String(list.length || '0') })] }), list.length ? list.map(i => jsxs('a', { href: i.url || '', className: 'gh-list-row w-full text-left px-3 py-2.5 flex gap-2.5 items-start rounded-md hover:bg-(--ui-bg-quinary) border border-transparent hover:border-(--ui-stroke-secondary) bg-transparent block', children: [jsx('span', { className: 'mt-0.5', children: jsx(Codicon, { name: 'issues', size: 20, style: { color: 'var(--ui-green)' } }) }), jsxs('span', { className: 'min-w-0 flex-1', children: [jsx('span', { className: 'block text-sm font-medium truncate', children: i.title || '' }), jsxs('span', { className: 'text-[10px] text-(--ui-text-tertiary)', children: [`#${i.number ?? ''}`, ' · ', `Updated ${new Date(i.updatedAt || '').toLocaleDateString()}`] })] })] }, i.number)) : jsx('p', { className: subClass + ' px-2', children: 'No assigned issues.' })] }) })(),
-      // Created
-      (() => { const issues = useCreatedIssues(); const list = Array.isArray(issues.data) ? issues.data : []; return jsxs('div', { className: 'mb-5', children: [jsxs('div', { className: 'flex items-baseline gap-2 px-2 mb-1', children: [jsx('h3', { className: 'text-sm font-semibold text-(--ui-text-primary)', children: 'Created by you' }), jsx('span', { className: countClass, children: String(list.length || '0') })] }), list.length ? list.map(i => jsxs('a', { href: i.url || '', className: 'gh-list-row w-full text-left px-3 py-2.5 flex gap-2.5 items-start rounded-md hover:bg-(--ui-bg-quinary) border border-transparent hover:border-(--ui-stroke-secondary) bg-transparent block', children: [jsx('span', { className: 'mt-0.5', children: jsx(Codicon, { name: 'issues', size: 20, style: { color: 'var(--ui-green)' } }) }), jsxs('span', { className: 'min-w-0 flex-1', children: [jsx('span', { className: 'block text-sm font-medium truncate', children: i.title || '' }), jsxs('span', { className: 'text-[10px] text-(--ui-text-tertiary)', children: [`#${i.number ?? ''}`, ' · ', `Updated ${new Date(i.updatedAt || '').toLocaleDateString()}`] })] })] }, i.number)) : jsx('p', { className: subClass + ' px-2', children: 'No created issues.' })] }) })(),
-      // Recent
-      (() => { const issues = useRecentIssues(); const list = Array.isArray(issues.data) ? issues.data : []; return jsxs('div', { className: 'mb-5', children: [jsxs('div', { className: 'flex items-baseline gap-2 px-2 mb-1', children: [jsx('h3', { className: 'text-sm font-semibold text-(--ui-text-primary)', children: 'Recent' }), jsx('span', { className: countClass, children: String(list.length || '0') })] }), list.length ? list.map(i => jsxs('a', { href: i.url || '', className: 'gh-list-row w-full text-left px-3 py-2.5 flex gap-2.5 items-start rounded-md hover:bg-(--ui-bg-quinary) border border-transparent hover:border-(--ui-stroke-secondary) bg-transparent block', children: [jsx('span', { className: 'mt-0.5', children: jsx(Codicon, { name: 'issues', size: 20, style: { color: 'var(--ui-green)' } }) }), jsxs('span', { className: 'min-w-0 flex-1', children: [jsx('span', { className: 'block text-sm font-medium truncate', children: i.title || '' }), jsxs('span', { className: 'text-[10px] text-(--ui-text-tertiary)', children: [`#${i.number ?? ''}`, ' · ', `Updated ${new Date(i.updatedAt || '').toLocaleDateString()}`] })] })] }, i.number)) : jsx('p', { className: subClass + ' px-2', children: 'No recent issues.' })] }) })(),
-      // Mentioned (approximate — no direct gh CLI filter; shown as placeholder)
-      jsxs('div', { className: 'mb-5', children: [jsxs('div', { className: 'flex items-baseline gap-2 px-2 mb-1', children: [jsx('h3', { className: 'text-sm font-semibold text-(--ui-text-primary)', children: 'Mentioned' }), jsx('span', { className: countClass, children: '—' })] }), jsx('p', { className: subClass + ' px-2 italic', children: 'Requires `gh search issues --search "involves:@me"` or manual check via GitHub web.' })] }),
-    ] }),
+  ] })
+}
+
+function AllIssuesView({ repo }) {
+  // Assigned
+  const assigned = useAssignedIssues(); const assignedList = Array.isArray(assigned.data) ? assigned.data : []
+  // Created
+  const created = useCreatedIssues(); const createdList = Array.isArray(created.data) ? created.data : []
+  // Recent
+  const recent = useRecentIssues(); const recentList = Array.isArray(recent.data) ? recent.data : []
+  const subClass = 'text-[11px] text-(--ui-text-tertiary) leading-4 mt-0.5'
+  const countClass = 'text-[13px] font-semibold text-(--ui-text-secondary) tabular-nums shrink-0 w-6 text-right'
+  const sectionClass = 'mb-5'
+  return jsxs('div', { className: 'gh-list', children: [
+    jsxs('section', { className: 'mb-2', children: [jsx('h2', { className: 'text-base font-bold text-(--ui-text-primary) px-2 mb-3', children: 'All Issues' })] }),
+    jsxs('div', { className: 'mb-5', children: [jsxs('div', { className: 'flex items-baseline gap-2 px-2 mb-1', children: [jsx('h3', { className: 'text-sm font-semibold text-(--ui-text-primary)', children: 'Assigned to you' }), jsx('span', { className: countClass, children: String(assignedList.length || '0') })] }), assignedList.length ? assignedList.map(i => jsxs('a', { href: i.url || '', className: 'gh-list-row w-full text-left px-3 py-2.5 flex gap-2.5 items-start rounded-md hover:bg-(--ui-bg-quinary) border border-transparent hover:border-(--ui-stroke-secondary) bg-transparent block', children: [jsx('span', { className: 'mt-0.5', children: jsx(Codicon, { name: 'issues', size: 20, style: { color: 'var(--ui-green)' } }) }), jsxs('span', { className: 'min-w-0 flex-1', children: [jsx('span', { className: 'block text-sm font-medium truncate', children: i.title || '' }), jsxs('span', { className: 'text-[10px] text-(--ui-text-tertiary)', children: [`#${i.number ?? ''}`, ' · ', `Updated ${new Date(i.updatedAt || '').toLocaleDateString()}`] })] })] }, i.number)) : jsx('p', { className: subClass + ' px-2', children: 'No assigned issues.' })] }),
+    jsxs('div', { className: 'mb-5', children: [jsxs('div', { className: 'flex items-baseline gap-2 px-2 mb-1', children: [jsx('h3', { className: 'text-sm font-semibold text-(--ui-text-primary)', children: 'Created by you' }), jsx('span', { className: countClass, children: String(createdList.length || '0') })] }), createdList.length ? createdList.map(i => jsxs('a', { href: i.url || '', className: 'gh-list-row w-full text-left px-3 py-2.5 flex gap-2.5 items-start rounded-md hover:bg-(--ui-bg-quinary) border border-transparent hover:border-(--ui-stroke-secondary) bg-transparent block', children: [jsx('span', { className: 'mt-0.5', children: jsx(Codicon, { name: 'issues', size: 20, style: { color: 'var(--ui-green)' } }) }), jsxs('span', { className: 'min-w-0 flex-1', children: [jsx('span', { className: 'block text-sm font-medium truncate', children: i.title || '' }), jsxs('span', { className: 'text-[10px] text-(--ui-text-tertiary)', children: [`#${i.number ?? ''}`, ' · ', `Updated ${new Date(i.updatedAt || '').toLocaleDateString()}`] })] })] }, i.number)) : jsx('p', { className: subClass + ' px-2', children: 'No created issues.' })] }),
+    jsxs('div', { className: 'mb-5', children: [jsxs('div', { className: 'flex items-baseline gap-2 px-2 mb-1', children: [jsx('h3', { className: 'text-sm font-semibold text-(--ui-text-primary)', children: 'Recent' }), jsx('span', { className: countClass, children: String(recentList.length || '0') })] }), recentList.length ? recentList.map(i => jsxs('a', { href: i.url || '', className: 'gh-list-row w-full text-left px-3 py-2.5 flex gap-2.5 items-start rounded-md hover:bg-(--ui-bg-quinary) border border-transparent hover:border-(--ui-stroke-secondary) bg-transparent block', children: [jsx('span', { className: 'mt-0.5', children: jsx(Codicon, { name: 'issues', size: 20, style: { color: 'var(--ui-green)' } }) }), jsxs('span', { className: 'min-w-0 flex-1', children: [jsx('span', { className: 'block text-sm font-medium truncate', children: i.title || '' }), jsxs('span', { className: 'text-[10px] text-(--ui-text-tertiary)', children: [`#${i.number ?? ''}`, ' · ', `Updated ${new Date(i.updatedAt || '').toLocaleDateString()}`] })] })] }, i.number)) : jsx('p', { className: subClass + ' px-2', children: 'No recent issues.' })] }),
+    jsxs('div', { className: 'mb-5', children: [jsxs('div', { className: 'flex items-baseline gap-2 px-2 mb-1', children: [jsx('h3', { className: 'text-sm font-semibold text-(--ui-text-primary)', children: 'Mentioned' }), jsx('span', { className: countClass, children: '—' })] }), jsx('p', { className: subClass + ' px-2 italic', children: 'Requires `gh search issues --search "involves:@me"` or manual check via GitHub web.' })] }),
   ] })
 }
 
@@ -3859,7 +3866,7 @@ function GitHubPane() {
             value: tab,
             onChange: v => $tab.set(v),
             className: 'gh-list-tabs w-full',
-            options: [{ id: 'prs', label: 'PRs' }, { id: 'issues', label: 'Issues' }, { id: 'inbox', label: 'Inbox' }],
+            options: [{ id: 'prs', label: 'PRs' }, { id: 'issues', label: 'Issues' }, { id: 'inbox', label: 'Inbox' }, { id: 'all-issues', label: 'All Issues' }],
           }),
           jsxs('div', {
             className: 'mt-3 flex items-center gap-2',
@@ -3884,7 +3891,9 @@ function GitHubPane() {
           ? jsx(PrList, { repo, query, active: paneVisible, onOpen: n => $selPr.set(n) })
           : tab === 'inbox'
             ? jsx(InboxView, { repo })
-            : jsx(IssueList, { repo, query, active: paneVisible, onOpen: n => $selIssue.set(n) }),
+            : tab === 'all-issues'
+              ? jsx(AllIssuesView, { repo })
+              : jsx(IssueList, { repo, query, active: paneVisible, onOpen: n => $selIssue.set(n) }),
       }),
     ],
   })
@@ -3930,7 +3939,7 @@ function GithubPage() {
                 value: tab,
                 onChange: v => $tab.set(v),
                 className: 'gh-list-tabs w-full max-w-[360px]',
-                options: [{ id: 'prs', label: 'PRs' }, { id: 'issues', label: 'Issues' }, { id: 'inbox', label: 'Inbox' }],
+                options: [{ id: 'prs', label: 'PRs' }, { id: 'issues', label: 'Issues' }, { id: 'inbox', label: 'Inbox' }, { id: 'all-issues', label: 'All Issues' }],
               }),
               jsxs('div', {
                 className: 'flex items-center gap-2',
@@ -3957,7 +3966,9 @@ function GithubPage() {
           ? jsx(PrList, { repo, query, onOpen: n => $selPr.set(n) })
           : tab === 'inbox'
             ? jsx(InboxView, { repo })
-            : jsx(IssueList, { repo, query, onOpen: n => $selIssue.set(n) }),
+            : tab === 'all-issues'
+              ? jsx(AllIssuesView, { repo })
+              : jsx(IssueList, { repo, query, onOpen: n => $selIssue.set(n) }),
       }),
     ],
   })
