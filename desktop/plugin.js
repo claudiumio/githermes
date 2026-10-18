@@ -1475,7 +1475,7 @@ function InboxView({ repo }) {
       jsx('p', { className: subClass + ' px-2', children: 'Pull requests that are ready to merge will appear here.' }),
       jsx('p', { className: subClass + ' px-2 italic', children: 'All caught up' }),
     ] }),
-  ] })
+  ] }) })
 }
 
 function AllIssuesView({ repo }) {
