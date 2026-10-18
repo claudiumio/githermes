@@ -1376,16 +1376,23 @@ function InboxView({ repo }) {
       jsx('p', { className: subClass + ' px-2', children: 'Pull requests waiting for approval, failing checks, merge conflicts, or required changes.' }),
       prs.length ? prs.map(p => {
         const prRepo = (p.repository && p.repository.nameWithOwner) ? p.repository.nameWithOwner : (repo || '')
+        const stateKey = (String(p.state || '').toLowerCase() === 'merged' ? 'merged' : String(p.state || '').toLowerCase() === 'closed' ? 'closed' : 'open')
+        const pill = STATE_PILL[stateKey] || STATE_PILL.open
         return jsxs('button', { type: 'button', onClick: () => navigateToSessionPr(prRepo, p.number), className: 'gh-list-row w-full text-left px-3 py-2.5 flex gap-2.5 items-start rounded-md hover:bg-(--ui-bg-quinary) border border-transparent hover:border-(--ui-stroke-secondary) bg-transparent', children: [
-          jsx('span', { className: 'mt-0.5', children: jsx(Codicon, { name: 'git-pull-request', size: 20, style: { color: 'var(--ui-green)' }, title: 'Pull request' }) }),
+          jsx('span', { className: 'mt-0.5', children: jsx(Avatar, { login: p.author?.login, size: 24 }) }),
           jsxs('span', { className: 'min-w-0 flex-1', children: [
-            jsxs('span', { className: 'flex w-full items-center gap-1.5 text-sm font-medium text-(--ui-text-primary)', children: [jsx('span', { className: 'truncate', children: p.title || '' }), jsx('span', { className: 'text-[10px] font-normal text-(--ui-text-tertiary) shrink-0', children: `#${p.number ?? ''}` })] }),
+            jsxs('button', { type: 'button', className: 'gh-row-open flex w-full items-center gap-1.5 text-left', children: [
+              jsx(Codicon, { name: pill.icon, size: 14, style: { color: pill.bg }, title: pill.label, className: 'shrink-0' }),
+              jsx(ItemTitle, { title: p.title, number: p.number }),
+            ] }),
             jsxs('span', { className: 'mt-1 flex flex-wrap items-center gap-x-1.5 text-[10px] text-(--ui-text-tertiary)', children: [
               p.author?.login ? jsx('span', { className: 'font-medium', children: `@${p.author.login}` }) : null,
+              jsx('span', { className: 'rounded bg-(--ui-bg-editor) px-1.5 py-0.5 font-mono', children: p.repository?.name || '—' }),
               jsx('span', { className: 'text-(--ui-text-quaternary)', children: '·' }),
-              jsx('span', { children: new Date(p.updatedAt || '').toLocaleDateString() }),
+              jsx('span', { children: ago(p.updatedAt) || new Date(p.updatedAt || '').toLocaleDateString() }),
             ] }),
           ] }),
+          jsx(Codicon, { name: 'chevron-right', className: 'mt-1 shrink-0 text-(--ui-text-quaternary)', 'aria-hidden': true }),
         ] })
       }) : jsx('p', { className: subClass + ' px-2 italic', children: 'All caught up' }),
     ] }),
