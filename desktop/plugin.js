@@ -1322,6 +1322,31 @@ function useRepos() {
   })
 }
 
+
+function useReviewRequestedPrs() {
+  return useQuery({
+    queryKey: [ID, 'review-requested-prs'],
+    queryFn: async () => {
+      try {
+        const out = await sh(`${GH} search prs --review-requested @me --state open --limit 30 --json number,title,state,author,updatedAt,url,repository`)
+        try { const parsed = JSON.parse(out); return Array.isArray(parsed) ? parsed : [] } catch { return [] }
+      } catch { return [] }
+    },
+    staleTime: 60_000,
+  })
+}
+function useDraftPrs() {
+  return useQuery({
+    queryKey: [ID, 'draft-prs'],
+    queryFn: async () => {
+      try {
+        const out = await sh(`${GH} search prs --assignee @me --author @me --draft --state open --limit 30 --json number,title,state,author,updatedAt,url,repository`)
+        try { const parsed = JSON.parse(out); return Array.isArray(parsed) ? parsed : [] } catch { return [] }
+      } catch { return [] }
+    },
+    staleTime: 60_000,
+  })
+}
 function useAssignedPrs() {
   return useQuery({
     queryKey: [ID, 'assigned-prs'],
@@ -1386,12 +1411,14 @@ function useAssignedIssues() {
 function InboxView({ repo }) {
   const prsQ = useAssignedPrs()
   const prs = Array.isArray(prsQ.data) ? prsQ.data : []
+  const reviewReq = useReviewRequestedPrs(); const reviewReqList = Array.isArray(reviewReq.data) ? reviewReq.data : []
+  const draftPrs = useDraftPrs(); const draftList = Array.isArray(draftPrs.data) ? draftPrs.data : []
   const sectionClass = 'mb-5 pb-4 border-b border-(--ui-stroke-secondary) last:border-0 last:pb-0'
   const subClass = 'text-[11px] text-(--ui-text-tertiary) leading-4 mt-0.5'
   const countClass = 'text-[13px] font-semibold text-(--ui-text-secondary) tabular-nums shrink-0 w-6 text-right'
   const titleClass = 'text-sm font-medium text-(--ui-text-primary) truncate'
   const metaClass = 'text-[11px] text-(--ui-text-tertiary) truncate'
-  return jsxs('div', { className: 'gh-list', children: [
+  return jsx(ScrollArea, { className: 'h-full', children: jsx('div', { className: 'gh-list', children: [
     // Needs your review
     jsxs('section', { className: sectionClass, children: [
       jsxs('div', { className: 'gh-list-heading flex items-center gap-1.5 px-2 mb-1 text-[10px] font-semibold', children: [jsx(Codicon, { name: 'git-pull-request', size: 12 }), 'NEEDS YOUR REVIEW', jsx('span', { className: countClass, children: '0' })] }),
@@ -1400,13 +1427,13 @@ function InboxView({ repo }) {
     ] }),
     // Needs your team's review
     jsxs('section', { className: sectionClass, children: [
-      jsxs('div', { className: 'flex items-baseline gap-2 px-2 mb-1', children: [jsx('h3', { className: 'gh-list-heading text-[10px] font-semibold uppercase tracking-wide', children: [jsx(Codicon, { name: 'git-pull-request', size: 12 }), "NEEDS YOUR TEAM'S REVIEW"] }), jsx('span', { className: countClass, children: '0' })] }),
+      jsxs('div', { className: 'flex items-baseline gap-2 px-2 mb-1', children: [jsx('h3', { className: 'gh-list-heading text-[10px] font-semibold uppercase tracking-wide', children: [jsx(Codicon, { name: 'git-pull-request', size: 12 }), "NEEDS YOUR TEAM'S REVIEW"] }), jsx('span', { className: countClass, children: String(reviewReqList.length || '0') })] }),
       jsx('p', { className: subClass + ' px-2', children: "Pull requests that need your team's review will appear here." }),
       jsx('p', { className: subClass + ' px-2 italic', children: 'All caught up' }),
     ] }),
     // Your drafts
     jsxs('section', { className: sectionClass, children: [
-      jsxs('div', { className: 'flex items-baseline gap-2 px-2 mb-1', children: [jsx('h3', { className: 'gh-list-heading text-[10px] font-semibold', children: [jsx(Codicon, { name: 'git-pull-request-draft', size: 12 }), ' ', 'YOUR DRAFTS'] }), jsx('span', { className: countClass, children: '0' })] }),
+      jsxs('div', { className: 'flex items-baseline gap-2 px-2 mb-1', children: [jsx('h3', { className: 'gh-list-heading text-[10px] font-semibold', children: [jsx(Codicon, { name: 'git-pull-request-draft', size: 12 }), ' ', 'YOUR DRAFTS'] }), jsx('span', { className: countClass, children: String(draftList.length || '0') })] }),
       jsx('p', { className: subClass + ' px-2', children: 'Pull requests that you have started but not yet submitted for review will appear here.' }),
       jsx('p', { className: subClass + ' px-2 italic', children: 'All caught up' }),
     ] }),
