@@ -668,8 +668,8 @@ function utf8ToB64(text) {
 
 async function postIssueComment(repo, number, text) {
   const tag = `ghprs.cmt.${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`
-  const file = `/tmp/${tag}`
-  const b64 = `/tmp/${tag}.b64`
+  const file = `ghprs_cmt_${tag}`
+  const b64 = `ghprs_cmt_b64_${tag}`
   try {
     const encoded = utf8ToB64(text)
     await sh(`: > ${sq(b64)}`)
