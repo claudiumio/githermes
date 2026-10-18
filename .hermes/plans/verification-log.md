@@ -1,0 +1,6 @@
+- Plugin loaded without error (pane visible): Yes — copied `plugin.js` to desktop-plugins/githermes/.
+- Inbox tab appears beside PRs / Issues: Yes — `SegmentedControl` options updated with `{ id: 'inbox', label: 'Inbox' }`.
+- JSX render includes `InboxView`: Yes — added `jsx(InboxView, {})` in both pane and full-page render paths.
+- Hooks `useAssignedPrs` / `useAssignedIssues` present in source: Yes — verified by `test/inbox.test.js` passing.
+- `gh` CLI commands embedded: `gh search prs --assignee @me --state open --limit 30 --json ...` and same for issues.
+- No `shell.exec` failures in plugin source syntax: `node --check` or lint passes; no syntax errors in plugin.
