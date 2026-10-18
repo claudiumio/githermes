@@ -1343,6 +1343,19 @@ function useAssignedIssues() {
   })
 }
 
+function InboxView() {
+  const prsQ = useAssignedPrs()
+  const issuesQ = useAssignedIssues()
+  const prs = Array.isArray(prsQ.data) ? prsQ.data : []
+  const issues = Array.isArray(issuesQ.data) ? issuesQ.data : []
+  return jsxs('div', { className: 'gh-list', children: [
+    jsx('h3', { className: 'gh-list-heading px-2 text-xs uppercase tracking-wider', children: 'Assigned PRs' }),
+    prs.length ? prs.map(p => jsx('a', { href: p.url || '', className: 'gh-list-row block px-2 py-2 text-sm hover:text-(--ui-accent)', children: [jsx('span', { className: 'font-medium', children: p.title || '' }), jsx('span', { className: 'text-[10px] text-(--ui-text-tertiary) ml-1', children: `#${p.number ?? ''}` })] }, p.number)) : jsx('p', { className: 'text-xs text-(--ui-text-tertiary) px-2', children: 'No assigned PRs.' }),
+    jsx('h3', { className: 'gh-list-heading px-2 mt-4 text-xs uppercase tracking-wider', children: 'Assigned Issues' }),
+    issues.length ? issues.map(i => jsx('a', { href: i.url || '', className: 'gh-list-row block px-2 py-2 text-sm hover:text-(--ui-accent)', children: [jsx('span', { className: 'font-medium', children: i.title || '' }), jsx('span', { className: 'text-[10px] text-(--ui-text-tertiary) ml-1', children: `#${i.number ?? ''}` })] }, i.number)) : jsx('p', { className: 'text-xs text-(--ui-text-tertiary) px-2', children: 'No assigned issues.' }),
+  ] })
+}
+
 // Behind count only changes after new data arrives, so the updater polls.
 // Non-numeric output (missing compare, no revision) means "not behind".
 export function parseBehindCount(raw) {
@@ -3758,7 +3771,7 @@ function GitHubPane() {
             value: tab,
             onChange: v => $tab.set(v),
             className: 'gh-list-tabs w-full',
-            options: [{ id: 'prs', label: 'PRs' }, { id: 'issues', label: 'Issues' }],
+            options: [{ id: 'prs', label: 'PRs' }, { id: 'issues', label: 'Issues' }, { id: 'inbox', label: 'Inbox' }],
           }),
           jsxs('div', {
             className: 'mt-3 flex items-center gap-2',
@@ -3781,7 +3794,9 @@ function GitHubPane() {
         className: 'flex-1 min-h-0',
         children: tab === 'prs'
           ? jsx(PrList, { repo, query, active: paneVisible, onOpen: n => $selPr.set(n) })
-          : jsx(IssueList, { repo, query, active: paneVisible, onOpen: n => $selIssue.set(n) }),
+          : tab === 'inbox'
+            ? jsx(InboxView, {})
+            : jsx(IssueList, { repo, query, active: paneVisible, onOpen: n => $selIssue.set(n) }),
       }),
     ],
   })
@@ -3827,7 +3842,7 @@ function GithubPage() {
                 value: tab,
                 onChange: v => $tab.set(v),
                 className: 'gh-list-tabs w-full max-w-[360px]',
-                options: [{ id: 'prs', label: 'PRs' }, { id: 'issues', label: 'Issues' }],
+                options: [{ id: 'prs', label: 'PRs' }, { id: 'issues', label: 'Issues' }, { id: 'inbox', label: 'Inbox' }],
               }),
               jsxs('div', {
                 className: 'flex items-center gap-2',
@@ -3852,7 +3867,9 @@ function GithubPage() {
         className: 'mx-auto flex w-full max-w-[1020px] flex-1 min-h-0 flex-col px-2 py-2 sm:px-6 sm:py-3',
         children: tab === 'prs'
           ? jsx(PrList, { repo, query, onOpen: n => $selPr.set(n) })
-          : jsx(IssueList, { repo, query, onOpen: n => $selIssue.set(n) }),
+          : tab === 'inbox'
+            ? jsx(InboxView, {})
+            : jsx(IssueList, { repo, query, onOpen: n => $selIssue.set(n) }),
       }),
     ],
   })
