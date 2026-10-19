@@ -3681,6 +3681,18 @@ function useListKeyboardFlow(query) {
   return { searchRef, onKeyDown }
 }
 
+function PollingIndicator({ q }) {
+  const [lastUpdated, setLastUpdated] = useState(Date.now())
+  useEffect(() => {
+    if (q && !q.isFetching && q.data) setLastUpdated(Date.now())
+  }, [q?.data, q?.isFetching])
+  if (!q) return null
+  return jsxs('span', { className: 'ml-2 flex items-center gap-1 text-[10px] text-(--ui-text-tertiary) whitespace-nowrap', children: [
+    q.isFetching ? jsx(GlyphSpinner, { className: 'size-3' }) : jsx(Codicon, { name: 'clock', size: 10, className: 'text-(--ui-text-quaternary)' }),
+    q.isFetching ? 'Updating...' : `Updated ${ago(lastUpdated) || 'just now'}`,
+  ] })
+}
+
 function GitHubPane() {
   const { reposQ, repo, repoOptions, tab, query, selPr, selIssue } = useGitHubShellState()
   const paneVisible = useValue(paneVisibleAtom())
@@ -3710,7 +3722,9 @@ function GitHubPane() {
               reposQ.isLoading
                 ? jsx(Skeleton, { className: 'h-8 flex-1 rounded-md' })
                 : jsx('div', { className: 'min-w-0 flex-1', children: jsx(RepoPicker, { repos: repoOptions, value: repo, onChange: v => $repo.set(v) }) }),
-              jsx(Button, { variant: 'ghost', size: 'sm', className: 'h-7 w-7 p-0 ml-auto', onClick: () => queryClient.invalidateQueries({ queryKey: [ID] }), 'aria-label': 'Refresh GitHub data', children: jsx(icons.RefreshCw, { className: 'size-3' }) }),
+              jsx('span', { className: 'flex-1 min-w-0' }),
+              jsx(PollingIndicator, { q: reposQ }),
+              jsx(Button, { variant: 'ghost', size: 'sm', className: 'h-7 w-7 p-0 ml-auto shrink-0', onClick: () => queryClient.invalidateQueries({ queryKey: [ID] }), 'aria-label': 'Refresh GitHub data', children: jsx(icons.RefreshCw, { className: 'size-3' }) }),
             ],
           }),
           jsx(Separator, { className: 'my-3' }),
