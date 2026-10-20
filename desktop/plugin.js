@@ -599,13 +599,25 @@ function sendCommentToChat(c) {
 let bashPath = null
 let bashReady = null
 
+// Hermes (NousResearch/hermes-agent cc89333889) serves `shell.exec` on the session
+// authority and REQUIRES `session_id`: a live local session, whose cwd the command runs in.
+// Without it every call returns `invalid_params` ("Could not load repositories", #107).
+// Prefer the focused tile's session, else the primary one.
+function currentSessionId() {
+  const st = host.state || {}
+  return (st.focusedSessionId && st.focusedSessionId.get && st.focusedSessionId.get())
+    || (st.activeSessionId && st.activeSessionId.get && st.activeSessionId.get())
+    || null
+}
+
 /** Resolve Git for Windows' bash once. No-op on POSIX, where commands run as-is. */
 function resolveBash() {
   if (bashReady) return bashReady
+  if (!POSIX_SHELL && !currentSessionId()) return Promise.resolve() // don't cache a sessionless miss
   bashReady = (async () => {
     if (POSIX_SHELL) return
     try {
-      const r = await host.request('shell.exec', { command: 'where git' })
+      const r = await host.request('shell.exec', { command: 'where git', session_id: currentSessionId() })
       const git = (r.stdout || '').split(/\r?\n/).map(s => s.trim()).filter(Boolean)[0]
       if (!git) return
       const normalizedGit = git.replace(/\\/g, '/')
@@ -613,18 +625,20 @@ function resolveBash() {
       const m = normalizedGit.match(/^(.*)\/(?:cmd|mingw64\/bin|usr\/bin)\/[^/]+$/i)
       const root = m ? m[1] : normalizedGit.replace(/\/[^/]+$/, '')
       for (const candidate of [`${root}\\bin\\bash.exe`, `${root}\\usr\\bin\\bash.exe`]) {
-        const probe = await host.request('shell.exec', { command: `if exist "${candidate}" echo FOUND` })
+        const probe = await host.request('shell.exec', { command: `if exist "${candidate}" echo FOUND`, session_id: currentSessionId() })
         if ((probe.stdout || '').includes('FOUND')) {
           bashPath = candidate
           break
         }
       }
     } catch { /* shellCommand's bash-not-found stub is the recovery path */ }
+    if (!bashPath) bashReady = null // retry next call instead of caching a transient failure
   })()
   return bashReady
 }
 
 async function shellCommand(cmd) {
+  if (!currentSessionId()) throw new Error('No active chat session. Open or start a chat, then Retry (Hermes runs shell.exec only inside a live session).')
   await resolveBash()
   if (POSIX_SHELL) return cmd
   if (!bashPath) return 'echo Git for Windows bash.exe was not found. Install Git for Windows and reopen this pane.&exit /b 9009'
@@ -641,7 +655,7 @@ async function shellCommand(cmd) {
 }
 
 async function sh(cmd) {
-  const r = await host.request('shell.exec', { command: await shellCommand(cmd) })
+  const r = await host.request('shell.exec', { command: await shellCommand(cmd), session_id: currentSessionId() })
   if (r.code !== 0) throw new Error((r.stderr || r.stdout || `exit ${r.code}`).trim().slice(0, 600))
   return (r.stdout || '').trim()
 }
@@ -883,7 +897,7 @@ async function fetchIssueByNumber(repo, n) {
 }
 
 async function shJsonLoose(cmd) {
-  const r = await host.request('shell.exec', { command: await shellCommand(cmd) })
+  const r = await host.request('shell.exec', { command: await shellCommand(cmd), session_id: currentSessionId() })
   const out = (r.stdout || '').trim()
   if (!out) {
     if (r.code !== 0) throw new Error((r.stderr || `exit ${r.code}`).trim().slice(0, 400))
