@@ -2611,6 +2611,14 @@ const HTML_COMMENT = /<!--[\s\S]*?-->/g
 const HTML_TAG = /<\/?[a-zA-Z][^>]*>/g
 const INLINE_RE = /(`[^`\n]+`|\*\*[^*]+\*\*|__[^_]+__|~~[^~\n]+~~|\*[^*\n]+\*|!\[[^\]]*\]\([^)]+\)|\[[^\]]+\]\([^)]+\)|https?:\/\/[^\s)]+)/g
 
+const MD_ALERTS = {
+  note: { label: 'Note', icon: 'info', color: 'var(--ui-blue)' },
+  tip: { label: 'Tip', icon: 'lightbulb', color: 'var(--ui-green)' },
+  important: { label: 'Important', icon: 'report', color: 'var(--ui-purple)' },
+  warning: { label: 'Warning', icon: 'warning', color: 'var(--ui-yellow)' },
+  caution: { label: 'Caution', icon: 'stop-circle', color: 'var(--ui-red)' },
+}
+
 function mdInline(text, key) {
   const s = String(text ?? '').replace(HTML_TAG, '')
   const out = []
@@ -2687,7 +2695,10 @@ export function mdBlocks(text) {
     if (/^>/.test(line)) {
       const buf = []
       while (i < lines.length && /^>/.test(lines[i])) { buf.push(lines[i].replace(/^>\s?/, '')); i++ }
-      blocks.push({ t: 'quote', children: mdBlocks(buf.join('\n')) })
+      const am = /^\[!(NOTE|TIP|IMPORTANT|WARNING|CAUTION)\]$/i.exec(buf[0] || '')
+      const alert = am ? am[1].toLowerCase() : undefined
+      if (alert) buf.shift()
+      blocks.push({ t: 'quote', ...(alert ? { alert } : {}), children: mdBlocks(buf.join('\n')) })
       continue
     }
     if (/^\|.*\|\s*$/.test(line) && i + 1 < lines.length && /^\|[\s:|-]+\|\s*$/.test(lines[i + 1])) {
@@ -2733,7 +2744,22 @@ function MdBlocksView({ blocks, keyPrefix }) {
       jsx('summary', { className: 'cursor-pointer select-none text-xs font-medium text-(--ui-text-secondary)', children: mdInline(b.summary, `${k}-s`) }, `${k}-s`),
       jsx('div', { className: 'mt-1 space-y-2', children: jsx(MdBlocksView, { blocks: b.children, keyPrefix: k }) }, `${k}-c`),
     ] }, k)
-    if (b.t === 'quote') return jsx('blockquote', { className: 'border-l-[3px] border-(--ui-stroke-secondary) pl-3 text-(--ui-text-tertiary) space-y-2', children: jsx(MdBlocksView, { blocks: b.children, keyPrefix: k }) }, k)
+    if (b.t === 'quote') {
+      const a = b.alert && MD_ALERTS[b.alert]
+      const body = jsx(MdBlocksView, { blocks: b.children, keyPrefix: k }, `${k}-body`)
+      if (!a) return jsx('blockquote', { className: 'border-l-[3px] border-(--ui-stroke-secondary) pl-3 text-(--ui-text-tertiary) space-y-2', children: body }, k)
+      return jsx('blockquote', {
+        className: 'border-l-[3px] rounded-md px-3 py-2 space-y-2 text-(--ui-text-secondary)',
+        style: { borderLeftColor: a.color, backgroundColor: 'var(--ui-bg-quaternary)' },
+        children: [
+          jsx('div', { className: 'flex items-center gap-1 text-xs font-semibold', style: { color: a.color }, children: [
+            jsx(Codicon, { name: a.icon, size: 14, 'aria-hidden': true }, `${k}-ico`),
+            jsx('span', { children: a.label }, `${k}-lbl`),
+          ] }, `${k}-title`),
+          body,
+        ],
+      }, k)
+    }
     if (b.t === 'table') return jsx('div', { className: 'overflow-x-auto rounded-md border border-(--ui-stroke-secondary)', children: jsx('table', { className: 'w-full text-xs', children: jsxs('tbody', { children: [
       jsx('tr', { className: 'bg-(--ui-bg-quaternary)', children: b.header.map((c, j) => jsx('th', { className: 'gh-divide border-b px-2 py-1 text-left font-semibold', children: mdInline(c, `${k}-h${j}`) }, j)) }),
       ...b.rows.map((r, ri) => jsx('tr', { children: r.map((c, j) => jsx('td', { className: 'gh-divide border-b border-transparent px-2 py-1 align-top last:border-b-0', children: mdInline(c, `${k}-r${ri}c${j}`) }, j)) }, ri)),
