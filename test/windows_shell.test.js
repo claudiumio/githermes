@@ -61,3 +61,16 @@ test('shell: bash is resolved once at registration', () => {
   const register = source.slice(source.indexOf('register(ctx) {'))
   assert.ok(register.includes('resolveBash()'), 'register must start bash resolution')
 })
+
+test('shell: every shell.exec carries the active session_id (#107)', () => {
+  // Hermes' session-authority shell.exec rejects a call without session_id as
+  // invalid_params, which surfaced as "Could not load repositories".
+  // Line-based: template literals like `${candidate}` contain `}`.
+  const calls = source.split('\n').filter(line => line.includes("host.request('shell.exec', {"))
+  assert.ok(calls.length >= 4, 'expected the wrapper callers, the where-git probe and the bash probe')
+  for (const call of calls) {
+    assert.ok(call.includes('session_id: currentSessionId()'), `shell.exec without session_id: ${call}`)
+  }
+  assert.ok(source.includes('function currentSessionId'), 'currentSessionId is missing')
+  assert.ok(source.includes('focusedSessionId') && source.includes('activeSessionId'), 'must read the session from host.state')
+})
