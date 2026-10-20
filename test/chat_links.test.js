@@ -1,6 +1,18 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { parseGithubLink, linkNavigationPlan, shouldInterceptClick, resolveRepoReset } from '../desktop/plugin.js'
+import { parseGithubLink, linkNavigationPlan, shouldInterceptClick, resolveRepoReset, prTagUrl } from '../desktop/plugin.js'
+
+test("prTagUrl reads the host PR chip's url from its React fiber ancestors", () => {
+  const url = 'https://github.com/a/b/pull/7'
+  const prTag = { memoizedProps: { pr: { number: 7, url } }, return: { memoizedProps: { session: {} }, return: null } }
+  let fiber = prTag
+  for (let i = 0; i < 12; i++) fiber = { memoizedProps: { asChild: true }, return: fiber } // Tip / Radix wrappers
+  const button = { __reactFiber$x1y2: { memoizedProps: { 'data-pr-link': true }, return: fiber } }
+  assert.equal(prTagUrl(button), url)
+  assert.equal(prTagUrl(button, 5), null, 'bounded walk')
+  assert.equal(prTagUrl({}), null, 'no fiber, host keeps the click')
+  assert.equal(prTagUrl({ __reactFiber$z: { memoizedProps: {}, return: null } }), null)
+})
 
 test('parseGithubLink maps PR / issue / repo links and rejects everything else', () => {
   const cases = [

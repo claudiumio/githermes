@@ -1290,14 +1290,28 @@ function navigateToGithubLink(link) {
   $selIssue.set(plan.selIssue)
 }
 
+// The host's PR chip (`PrTag`, on sidebar rows and the composer's branch row) is
+// a <button data-pr-link> with no href: its URL lives only in the React props.
+// ponytail: reads React's private fiber; swap for an SDK link hook once the host offers one.
+export function prTagUrl(el, maxDepth = 40) {
+  const key = Object.keys(el).find(k => k.startsWith('__reactFiber$'))
+  for (let f = key ? el[key] : null, i = 0; f && i < maxDepth; f = f.return, i++) {
+    const url = f.memoizedProps?.pr?.url
+    if (typeof url === 'string') return url
+  }
+  return null
+}
+
 function onChatLinkClick(event) {
   if (!interceptChatLinks || !shouldInterceptClick(event)) return
   const target = event.target instanceof Element ? event.target : null
-  const a = target?.closest('a[href]')
-  // Only links inside the conversation (assistant-ui message roots), never
-  // this plugin's own pane/page or app chrome.
-  if (!a || !a.closest('[data-slot^="aui_"]') || a.closest('.githermes-pane')) return
-  const link = parseGithubLink(a.getAttribute('href') || '')
+  if (!target || target.closest('.githermes-pane')) return
+  const a = target.closest('a[href]')
+  const chip = target.closest('button[data-pr-link]')
+  // Links only inside the conversation (assistant-ui message roots), never app chrome.
+  const href = a ? (a.closest('[data-slot^="aui_"]') ? a.getAttribute('href') : null)
+    : chip ? prTagUrl(chip) : null
+  const link = href && parseGithubLink(href)
   if (!link) return
   event.preventDefault()
   event.stopImmediatePropagation()
