@@ -51,6 +51,17 @@ test('a fallback chat failing for another reason surfaces the error and keeps th
   assert.equal(currentSessionId(), 'chat-5', 'a transient failure does not drop the chat')
 })
 
+for (const reason of ['not_found', 'session_superseded']) {
+  test(`a fallback chat answering ${reason} is dropped for the neutral state`, async t => {
+    setLive('chat-gone')
+    currentSessionId()
+    setLive(null)
+    t.mock.method(host, 'request', async () => { throw new Error(reason) })
+    await assert.rejects(sh('gh api user'), err => err.message === NO_SESSION)
+    assert.equal(currentSessionId(), null, `${reason} drops the remembered chat`)
+  })
+}
+
 test('a chat going live refetches the views that errored while waiting', async t => {
   globalThis.window ??= { addEventListener() {}, removeEventListener() {}, dispatchEvent() {} }
   setLive('chat-6')

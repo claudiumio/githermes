@@ -635,7 +635,8 @@ async function shellExec(cmd) {
   try {
     return await host.request('shell.exec', { command, session_id })
   } catch (e) {
-    const rejected = /invalid_params/.test(String((e && e.message) || e))
+    // A pruned chat answers not_found, a chat that moved on answers session_superseded.
+    const rejected = /invalid_params|not_found|session_superseded/.test(String((e && e.message) || e))
     if (session_id === liveSessionId() || !rejected) throw e
     if (lastSessionId === session_id) lastSessionId = null
     throw new Error(NO_SESSION)
