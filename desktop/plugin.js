@@ -1306,11 +1306,11 @@ function onChatLinkClick(event) {
   if (!interceptChatLinks || !shouldInterceptClick(event)) return
   const target = event.target instanceof Element ? event.target : null
   if (!target || target.closest('.githermes-pane')) return
-  const a = target.closest('a[href]')
   const chip = target.closest('button[data-pr-link]')
+  const a = target.closest('a[href]')
   // Links only inside the conversation (assistant-ui message roots), never app chrome.
-  const href = a ? (a.closest('[data-slot^="aui_"]') ? a.getAttribute('href') : null)
-    : chip ? prTagUrl(chip) : null
+  const href = chip ? prTagUrl(chip)
+    : a?.closest('[data-slot^="aui_"]') ? a.getAttribute('href') : null
   const link = href && parseGithubLink(href)
   if (!link) return
   event.preventDefault()
