@@ -22,11 +22,12 @@ test('shell: every gh/hermes invocation resolves the binary per platform', () =>
 test('shell: every shell.exec goes through the shellCommand wrapper', () => {
   // A raw `host.request('shell.exec', { command: cmd })` call site bypasses the
   // Windows bash hop and reintroduces the cmd.exe bug for that one query.
-  const calls = source.match(/host\.request\('shell\.exec', \{ command: [^}]*\}/g) || []
-  assert.ok(calls.length >= 4, 'expected the wrapper callers, the where-git probe and the bash probe')
+  const calls = source.match(/host\.request\('shell\.exec', \{ command[^}]*\}/g) || []
+  assert.equal(calls.length, 3, 'expected the shellExec wrapper, the where-git probe and the bash probe')
+  assert.ok(source.includes('const command = await shellCommand(cmd)'), 'shellExec must wrap through shellCommand')
   for (const call of calls) {
     const ok =
-      call.includes('shellCommand(') ||
+      call.includes('{ command, session_id }') ||
       call.includes("'where git'") ||
       call.includes('if exist')
     assert.ok(ok, `unwrapped shell.exec call site: ${call}`)
@@ -57,20 +58,18 @@ test('shell: Windows routes through Git bash, not WSL bash', () => {
   assert.ok(source.includes("Git for Windows bash.exe was not found"), 'missing Git Bash needs a clear recovery error')
 })
 
-test('shell: bash is resolved once at registration', () => {
+test('shell: registration does not probe a shell before a chat exists', () => {
   const register = source.slice(source.indexOf('register(ctx) {'))
-  assert.ok(register.includes('resolveBash()'), 'register must start bash resolution')
+  assert.ok(!register.includes('resolveBash()'), 'registration must not require a session to probe bash')
 })
 
-test('shell: every shell.exec carries the active session_id (#107)', () => {
+test('shell: every shell.exec carries a session_id (#107)', () => {
   // Hermes' session-authority shell.exec rejects a call without session_id as
   // invalid_params, which surfaced as "Could not load repositories".
-  // Line-based: template literals like `${candidate}` contain `}`.
   const calls = source.split('\n').filter(line => line.includes("host.request('shell.exec', {"))
-  assert.ok(calls.length >= 4, 'expected the wrapper callers, the where-git probe and the bash probe')
+  assert.equal(calls.length, 3, 'expected the shellExec wrapper, the where-git probe and the bash probe')
   for (const call of calls) {
-    assert.ok(call.includes('session_id: currentSessionId()'), `shell.exec without session_id: ${call}`)
+    assert.ok(/session_id(: currentSessionId\(\))? \}/.test(call), `shell.exec without session_id: ${call}`)
   }
-  assert.ok(source.includes('function currentSessionId'), 'currentSessionId is missing')
   assert.ok(source.includes('focusedSessionId') && source.includes('activeSessionId'), 'must read the session from host.state')
 })
