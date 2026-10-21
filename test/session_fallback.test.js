@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { host } from '@hermes/plugin-sdk'
-import { classifyGhError, currentSessionId, NO_SESSION, rememberSessionId, sh } from '../desktop/plugin.js'
+import { host, queryClient } from '@hermes/plugin-sdk'
+import plugin, { classifyGhError, currentSessionId, NO_SESSION, rememberSessionId, sh } from '../desktop/plugin.js'
 
 const atom = value => ({ get: () => value })
 
@@ -39,6 +39,54 @@ test('a live chat failure surfaces as the real error, not as a missing chat', as
   host.request = async () => { throw new Error('dangerous_command') }
   setLive('chat-2')
   await assert.rejects(sh('gh api user'), /dangerous_command/)
+})
+
+test('a fallback chat failing for another reason surfaces the error and keeps the chat', async t => {
+  setLive('chat-5')
+  currentSessionId()
+  setLive(null)
+  const error = new Error('host timeout')
+  t.mock.method(host, 'request', async () => { throw error })
+  await assert.rejects(sh('gh api user'), err => err === error)
+  assert.equal(currentSessionId(), 'chat-5', 'a transient failure does not drop the chat')
+})
+
+test('a chat going live refetches the views that errored while waiting', async t => {
+  globalThis.window ??= { addEventListener() {}, removeEventListener() {}, dispatchEvent() {} }
+  setLive('chat-6')
+  currentSessionId()
+  setLive(null)
+  t.mock.method(host, 'request', async () => { throw new Error('invalid_params') })
+  await assert.rejects(sh('gh api user'), err => err.message === NO_SESSION)
+
+  let goLive
+  let unsubscribed = false
+  host.state.focusedSessionId = {
+    get: () => null,
+    subscribe: fn => { goLive = fn; return () => { unsubscribed = true } },
+  }
+  const calls = []
+  t.mock.method(queryClient, 'invalidateQueries', arg => { calls.push(arg); return Promise.resolve() })
+  const disposers = []
+  const ctx = new Proxy({
+    storage: { get: (k, d) => d, set() {} },
+    onDispose: fn => disposers.push(fn),
+  }, { get: (t, k) => (k in t ? t[k] : () => () => {}) })
+  t.after(() => {
+    disposers.forEach(fn => fn())
+    setLive(null)
+    assert.equal(unsubscribed, true, 'plugin disposal removes the subscription')
+  })
+  plugin.register(ctx)
+  goLive(null)
+  assert.equal(calls.length, 0, 'a draft does not trigger invalidation')
+  goLive('chat-7')
+  assert.equal(calls.length, 1, 'first live chat triggers one invalidation')
+  assert.deepEqual(calls[0].queryKey, ['githermes'])
+  assert.equal(calls[0].predicate({ state: { status: 'error' } }), true)
+  assert.equal(calls[0].predicate({ state: { status: 'success' } }), false)
+  goLive('chat-8')
+  assert.equal(calls.length, 1, 'another live chat does not invalidate again')
 })
 
 test('rememberSessionId reports only the first chat after none', () => {

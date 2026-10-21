@@ -635,7 +635,8 @@ async function shellExec(cmd) {
   try {
     return await host.request('shell.exec', { command, session_id })
   } catch (e) {
-    if (session_id === liveSessionId()) throw e
+    const rejected = /invalid_params/.test(String((e && e.message) || e))
+    if (session_id === liveSessionId() || !rejected) throw e
     if (lastSessionId === session_id) lastSessionId = null
     throw new Error(NO_SESSION)
   }
