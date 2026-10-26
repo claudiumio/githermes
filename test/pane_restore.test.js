@@ -1,64 +1,67 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
+import { host } from '@hermes/plugin-sdk'
+import plugin from '../desktop/plugin.js'
 
-// Behavioural check for load-time pane restore: register() must reopen the
-// GitHub pane only when the user left it open, and plugin unload must not be
-// mistaken for the user closing it.
-
+globalThis.window ??= { addEventListener() {}, removeEventListener() {} }
 const store = new Map()
-globalThis.localStorage = {
-  getItem: k => (store.has(k) ? store.get(k) : null),
-  setItem: (k, v) => store.set(k, String(v)),
-  removeItem: k => store.delete(k),
-}
-globalThis.window ??= { addEventListener() {}, removeEventListener() {}, dispatchEvent() {} }
-
-const { host } = await import('@hermes/plugin-sdk')
 const opened = []
-let closedByHost = 0
+let onClose
 host.openWorkspace = (key, opts) => {
   opened.push(key)
-  return () => { closedByHost += 1; opts.onClose?.() }
+  onClose = opts.onClose
+  return () => opts.onClose?.()
 }
-host.paneVisibility = () => ({ get: () => false, listen: () => () => {}, subscribe: () => () => {} })
+host.paneVisibility = () => ({ get: () => false })
 host.undismissPane = () => {}
 host.revealPane = () => {}
 
-const { default: plugin } = await import('../desktop/plugin.js')
-
-function load() {
+function load(storage = store) {
   const disposers = []
-  const ctx = new Proxy({
-    register: () => () => {},
+  const contributions = []
+  plugin.register(new Proxy({
+    register: item => contributions.push(item),
     onDispose: fn => disposers.push(fn),
-    rest: async () => ({}),
-    os: { openExternal() {} },
-    storage: { get: () => undefined, set() {} },
-  }, { get: (t, k) => (k in t ? t[k] : () => () => {}) })
-  plugin.register(ctx)
-  return () => disposers.forEach(fn => fn())
+    storage: { get: (key, fallback) => storage.has(key) ? storage.get(key) : fallback, set: (key, value) => storage.set(key, value) },
+  }, { get: (t, k) => (k in t ? t[k] : () => () => {}) }))
+  return {
+    unload: () => disposers.forEach(fn => fn()),
+    open: () => contributions.find(c => c.id === 'palette').data.run(),
+  }
 }
 
-function withLoad(fn) {
-  opened.length = 0
-  const unload = load()
-  try { fn(unload) } finally { unload() }
-}
-
-test('fresh install: loading the plugin does not force the pane open', () => {
+test('fresh install does not open; explicit open persists through unload and reload', () => {
   store.clear()
-  withLoad(() => assert.equal(opened.length, 0))
+  opened.length = 0
+  let app = load()
+  assert.equal(opened.length, 0)
+  app.open()
+  assert.equal(store.get('paneOpen'), true)
+  app.unload()
+  assert.equal(store.get('paneOpen'), true, 'unload is not a user close')
+  app = load()
+  assert.equal(opened.length, 2, 'the second load restores the open pane')
+  app.unload()
 })
 
-test('pane left open survives a reload; unload is not a user close', () => {
-  store.set('githermes.paneOpen.v1', '1')
-  withLoad(() => assert.equal(opened.length, 1, 'restores the pane the user left open'))
-  // the plugin refresh / app quit above tore the tile down…
-  assert.equal(store.get('githermes.paneOpen.v1'), '1', '…without forgetting it was open')
-  withLoad(() => assert.equal(opened.length, 1))
+test('user close is persisted and prevents restoration', () => {
+  store.set('paneOpen', true)
+  const app = load()
+  onClose()
+  assert.equal(store.get('paneOpen'), false)
+  app.unload()
+  opened.length = 0
+  const next = load()
+  assert.equal(opened.length, 0)
+  next.unload()
 })
 
-test('pane the user closed stays closed across a reload', () => {
-  store.set('githermes.paneOpen.v1', '0')
-  withLoad(() => assert.equal(opened.length, 0))
+test('plugin storage namespaces do not share the open flag', () => {
+  const otherProfile = new Map()
+  store.set('paneOpen', true)
+  opened.length = 0
+  const app = load(otherProfile)
+  assert.equal(opened.length, 0)
+  app.unload()
+  assert.equal(store.get('paneOpen'), true)
 })
