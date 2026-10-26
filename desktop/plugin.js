@@ -401,10 +401,10 @@ let paneRender = null
 let paneClose = null
 // Whether the USER left the pane open, so app launch / plugin reload restores
 // that instead of force-opening the pane on every load.
-const OPEN_KEY = 'githermes.paneOpen.v1'
+const OPEN_KEY = 'paneOpen'
 let disposing = false
-const rememberOpen = open => { try { localStorage.setItem(OPEN_KEY, open ? '1' : '0') } catch {} }
-const wasLeftOpen = () => { try { return localStorage.getItem(OPEN_KEY) === '1' } catch { return false } }
+const rememberOpen = open => { try { pluginCtx?.storage.set(OPEN_KEY, open) } catch {} }
+const wasLeftOpen = () => { try { return pluginCtx?.storage.get(OPEN_KEY) === true } catch { return false } }
 
 const usesWorkspaceTile = () => typeof host.openWorkspace === 'function'
 

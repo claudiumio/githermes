@@ -32,6 +32,8 @@ A single-file desktop plugin (`@hermes/plugin-sdk`) that shows your repository's
 - **Issues** — label chips in the label's own color, black/white text via W3C relative luminance
 - **Theme** — field surfaces on `--ui-editor-surface-background` (matte/glass inherited from Desktop); cards on `--ui-bg-quaternary`; container queries at `<360` / `<300` / `<240`
 
+- **Pane restore**: the open flag uses plugin-scoped `ctx.storage`. A user close stays closed; plugin unload preserves the flag. The previous renderer-local flag is not migrated, so reopen the pane once after upgrading.
+
 ## Requirements
 
 - Hermes Desktop on **Linux or macOS**
