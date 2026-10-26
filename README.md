@@ -20,6 +20,7 @@ A single-file desktop plugin (`@hermes/plugin-sdk`) that shows your repository's
 
 ## Features
 
+- **Open GitHub URL**: paste a repository, PR or issue URL into the field at the top of the GitHermes pane or page, then choose **Open URL**. Invalid URLs show an error without changing the selection. Chat links and native Hermes PR chips retain their host behavior; GitHermes does not intercept them.
 - **PR list** — state pills, `+N / −N`, relative timestamps, **CI** (`passing / pending / failing`) and **review** (`approved / changes / required`) chips, exact `#N` search (`#42` does not match `#142`)
 - **Session chip + repo picker** — PR for the active session branch (same join as the core review pane); 32px pill with `https://github.com/{owner}.png` avatar
 - **PR / Issue header** — kicker, grouped meta chips, title glued to `#`, **Merge** action on open PRs (`squash / merge / rebase`, optional delete-branch, `GH_PROMPT_DISABLED=1`)
