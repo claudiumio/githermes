@@ -943,6 +943,8 @@ export function issuePlan(repo, number, state) {
 // phrases first, generic last. Recovery commands are copy-only, never executed.
 export function classifyGhError(e) {
   const raw = String((e && e.message) || e || '')
+  if (/Windows is unavailable until shell\.exec/.test(raw))
+    return { kind: 'unsupported', title: 'GitHermes is unavailable on Windows', detail: 'Windows support is suspended until safe shell execution is available. Use GitHermes on Linux or macOS.' }
   if (raw.includes(NO_SESSION))
     return { kind: 'session', title: 'Start a chat to load GitHub', detail: 'Pull requests and issues load through a chat. Send a message in any chat and this view refreshes on its own.' }
   if (/gh: command not found|command not found: gh|No such file or directory/i.test(raw) && /gh/.test(raw))
@@ -2815,8 +2817,8 @@ function ListErrorState({ title, error, onRetry }) {
 // stderr under the caller's title. Commands are copy-only, never run.
 function GhErrorState({ title, error, onRetry }) {
   const c = classifyGhError(error)
-  // Waiting for a chat is a state, not a failure: no red, no Retry that repeats it.
-  if (c.kind === 'session') return jsx(EmptyState, { title: c.title, description: c.detail })
+  // Missing prerequisites cannot be fixed by retrying the same query.
+  if (c.kind === 'session' || c.kind === 'unsupported') return jsx(EmptyState, { title: c.title, description: c.detail })
   const resolved = c.kind === 'unknown' ? title : c.title
   return jsx(ErrorState, {
     title: resolved,
