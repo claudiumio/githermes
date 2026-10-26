@@ -34,8 +34,10 @@ A single-file desktop plugin (`@hermes/plugin-sdk`) that shows your repository's
 
 ## Requirements
 
-- Hermes Desktop
+- Hermes Desktop on **Linux or macOS**
 - [`gh`](https://cli.github.com/) installed and authenticated (`gh auth status`)
+
+Windows support is suspended until Hermes exposes a safe executable/argv route for `shell.exec`. GitHermes rejects Windows shell operations before any host call; the former encoded Git Bash wrapper has been removed so commands remain visible to dangerous-command checks.
 
 ## Install
 

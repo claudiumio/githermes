@@ -55,15 +55,11 @@ const GITHUB_ROUTE = '/github'
 const ROUTES_AREA_LIT = 'routes'
 const SIDEBAR_NAV_LIT = 'sidebar.nav'
 const TRUNK = new Set(['main', 'master', 'dev', 'develop', 'trunk'])
-// POSIX PATH prefix so `gh` resolves under macOS/Linux shells that don't
-// inherit the user's login PATH (Homebrew, /usr/local). Windows runs
-// shell.exec through cmd.exe, where a leading `PATH=... cmd` assignment is
-// parsed as a VARIABLE NAMES command and the binary never runs — it exits 0
-// with empty stdout. Detect the shell and only prefix where it is valid.
+// POSIX PATH prefix for shells that do not inherit the login PATH.
 const POSIX_SHELL = typeof navigator === 'undefined' || !/win/i.test(navigator.platform || navigator.userAgent || '')
 const POSIX_PATH = 'PATH=/opt/homebrew/bin:/usr/local/bin:$PATH '
-const GH = `${POSIX_SHELL ? POSIX_PATH : ''}gh`
-const HERMES = `${POSIX_SHELL ? POSIX_PATH : ''}hermes`
+const GH = `${POSIX_PATH}gh`
+const HERMES = `${POSIX_PATH}hermes`
 const PLUGIN_NAME = 'githermes'
 // $HERMES_HOME is expanded by the backend shell (profile-aware); double quotes
 // keep it a single word while still letting the env var through.
@@ -576,28 +572,7 @@ function sendCommentToChat(c) {
   insertComposerText(commentToChatText(c))
 }
 
-// `shell.exec` runs through cmd.exe on Windows, where the plugin's POSIX
-// toolbox (base64, wc, tail, printf, unlink) and `/tmp` do not exist — every
-// big-payload read and the comment composer would fail. Route the command
-// through Git for Windows' bash so one command string works on all platforms.
-// The POSIX PATH prefix above stays a no-op under bash; on Windows it is
-// dropped because cmd.exe would swallow the binary name.
-//
-// `bash` on PATH is NOT safe to assume: Windows ships WSL's bash.exe in
-// System32, which would run the command against a different filesystem (and
-// no `gh`). Derive bash from the resolved `git` install instead.
-//
-// The command text itself never crosses `cmd.exe /c` (shell=True spawn): cmd parses
-// that string itself, so `|` `>` `&&` `^` are live operators, `%VAR%` expands, and
-// inner double quotes break argv quoting (the .bat-shim PR's "unexpected end of
-// file from `if' command"). Only base64 crosses, because its alphabet
-// [A-Za-z0-9+/=] is metachar-free; bash decodes it into a `$$`-unique /tmp script
-// and runs it, so concurrent shell.exec calls share no file state. The decode must
-// go through a file, never `base64 -d | bash`: the gateway's approval detector
-// blocks that shape as command obfuscation, and it flags `rm /tmp/x` as a root-path
-// delete, which is why the cleanup uses `unlink`.
-let bashPath = null
-let bashReady = null
+// Windows is suspended until shell.exec supports transparent executable/argv calls.
 
 // Hermes (NousResearch/hermes-agent cc89333889) serves `shell.exec` on the session
 // authority and REQUIRES `session_id`: a live local session, whose cwd the command runs in.
@@ -630,8 +605,10 @@ export function currentSessionId() {
 export const NO_SESSION = 'GitHermes is waiting for a started chat'
 
 async function shellExec(cmd) {
+  if (!POSIX_SHELL) throw new Error('GitHermes on Windows is unavailable until shell.exec supports executable/argv safely.')
   const session_id = currentSessionId()
-  const command = await shellCommand(cmd)
+  if (!session_id) throw new Error(NO_SESSION)
+  const command = cmd
   try {
     return await host.request('shell.exec', { command, session_id })
   } catch (e) {
@@ -641,50 +618,6 @@ async function shellExec(cmd) {
     if (lastSessionId === session_id) lastSessionId = null
     throw new Error(NO_SESSION)
   }
-}
-
-/** Resolve Git for Windows' bash once. No-op on POSIX, where commands run as-is. */
-function resolveBash() {
-  if (bashReady) return bashReady
-  if (!POSIX_SHELL && !currentSessionId()) return Promise.resolve() // don't cache a sessionless miss
-  bashReady = (async () => {
-    if (POSIX_SHELL) return
-    try {
-      const r = await host.request('shell.exec', { command: 'where git', session_id: currentSessionId() })
-      const git = (r.stdout || '').split(/\r?\n/).map(s => s.trim()).filter(Boolean)[0]
-      if (!git) return
-      const normalizedGit = git.replace(/\\/g, '/')
-      // <root>/cmd/git.exe | <root>/mingw64/bin/git.exe -> <root>/bin/bash.exe
-      const m = normalizedGit.match(/^(.*)\/(?:cmd|mingw64\/bin|usr\/bin)\/[^/]+$/i)
-      const root = m ? m[1] : normalizedGit.replace(/\/[^/]+$/, '')
-      for (const candidate of [`${root}\\bin\\bash.exe`, `${root}\\usr\\bin\\bash.exe`]) {
-        const probe = await host.request('shell.exec', { command: `if exist "${candidate}" echo FOUND`, session_id: currentSessionId() })
-        if ((probe.stdout || '').includes('FOUND')) {
-          bashPath = candidate
-          break
-        }
-      }
-    } catch { /* shellCommand's bash-not-found stub is the recovery path */ }
-    if (!bashPath) bashReady = null // retry next call instead of caching a transient failure
-  })()
-  return bashReady
-}
-
-async function shellCommand(cmd) {
-  if (!currentSessionId()) throw new Error(NO_SESSION)
-  await resolveBash()
-  if (POSIX_SHELL) return cmd
-  if (!bashPath) return 'echo Git for Windows bash.exe was not found. Install Git for Windows and reopen this pane.&exit /b 9009'
-  // Only base64 crosses cmd.exe (see the block comment above). Inside bash the
-  // command is decoded into a $$-unique /tmp script, so concurrent shell.exec
-  // calls share no file state, and `-l` is what makes `gh` resolve from the
-  // login shell's PATH.
-  const b64 = utf8ToB64(cmd)
-  // ponytail: cmd.exe /c caps the command line at 8191 chars and b64 inflates 4/3;
-  // past this the caller must split the command. shBig is not the escape hatch:
-  // it routes back through sh/shellCommand and would throw the same guard.
-  if (b64.length > 6000) throw new Error(`command too long for cmd.exe (${b64.length} b64 chars); split it into smaller commands`)
-  return `"${bashPath}" -l -c "echo ${b64} | tr -d '\\r\\n' | base64 -d > /tmp/gt$$.sh; bash /tmp/gt$$.sh; e=$?; unlink /tmp/gt$$.sh; exit $e"`
 }
 
 export async function sh(cmd) {
@@ -824,7 +757,7 @@ async function shBig(cmd) {
   const tag = `ghprs.${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`
   const raw = `/tmp/${tag}.raw`, hex = `/tmp/${tag}.hex`
   try {
-    // od -An -v -tx1 is POSIX: BSD od on macOS, coreutils od in Git for Windows' bash.
+    // od -An -v -tx1 is POSIX: BSD od on macOS, coreutils od on Linux.
     // -v keeps repeated lines (od collapses them to `*` otherwise).
     await sh(`${cmd} > ${sq(raw)} && od -An -v -tx1 < ${sq(raw)} | tr -cd 0-9a-f > ${sq(hex)}`)
     const byteLength = Number(await sh(`wc -c < ${sq(hex)}`))
