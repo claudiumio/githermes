@@ -1322,23 +1322,41 @@ function navigateToGithubLink(link) {
 }
 
 function GithubLinkForm() {
+  const [checking, setChecking] = useState(false)
+  const pending = useRef(false)
   return jsxs('form', {
     className: 'flex shrink-0 gap-2 p-3',
-    onSubmit: event => {
+    onSubmit: async event => {
       event.preventDefault()
+      if (pending.current) return
       const form = event.currentTarget
       const link = parseGithubLink(form.elements.namedItem('github-url').value.trim())
       if (!link) {
-        host.notify({ kind: 'error', message: 'Enter a GitHub repository, pull request or issue URL.' })
+        host.notify?.({ kind: 'error', message: 'Enter a GitHub repository, pull request or issue URL.' })
         return
       }
-      navigateToGithubLink(link)
-      host.notify({ kind: 'success', message: `Opened ${link.repo}${link.number ? ` #${link.number}` : ''}` })
-      form.reset()
+      pending.current = true
+      setChecking(true)
+      const selection = [$repo, $tab, $selPr, $selIssue]
+      const startSelection = selection.map(store => store.get())
+      try {
+        const viewed = await shJson(`${GH} repo view ${sq(link.repo)} --json nameWithOwner`)
+        // Match the picker's stale-result guard, including same-repo item changes.
+        if (selection.some((store, i) => store.get() !== startSelection[i])) return
+        if (!repoOk(viewed?.nameWithOwner)) throw new Error('Repository not found')
+        navigateToGithubLink({ ...link, repo: viewed.nameWithOwner })
+        host.notify?.({ kind: 'success', message: `Opened ${viewed.nameWithOwner}${link.number ? ` #${link.number}` : ''}` })
+        form.reset()
+      } catch (e) {
+        host.notify?.({ kind: 'error', message: String(e?.message || e || 'Repository not found').slice(0, 200) })
+      } finally {
+        pending.current = false
+        setChecking(false)
+      }
     },
     children: [
-      jsx(Input, { name: 'github-url', 'aria-label': 'GitHub URL', placeholder: 'GitHub PR, issue or repository URL', className: 'min-w-0 flex-1', required: true }),
-      jsx(Button, { type: 'submit', variant: 'outline', size: 'sm', children: 'Open URL' }),
+      jsx(Input, { name: 'github-url', 'aria-label': 'GitHub URL', placeholder: 'GitHub PR, issue or repository URL', className: 'min-w-0 flex-1', required: true, disabled: checking }),
+      jsx(Button, { type: 'submit', variant: 'outline', size: 'sm', loading: checking, children: 'Open URL' }),
     ],
   })
 }
