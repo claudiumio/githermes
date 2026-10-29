@@ -3,7 +3,6 @@ import assert from 'node:assert/strict'
 import { host } from '@hermes/plugin-sdk'
 import plugin from '../desktop/plugin.js'
 
-globalThis.window ??= { addEventListener() {}, removeEventListener() {} }
 const store = new Map()
 const opened = []
 let onClose

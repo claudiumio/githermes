@@ -21,6 +21,7 @@ A single-file desktop plugin (`@hermes/plugin-sdk`) that shows your repository's
 ## Features
 
 - **Open GitHub URL**: paste a repository, PR or issue URL into the field at the top of the GitHermes pane or page, then choose **Open URL**. Invalid URLs show an error without changing the selection. Chat links and native Hermes PR chips retain their host behavior; GitHermes does not intercept them.
+- **Pane restore**: the open flag uses plugin-scoped `ctx.storage`. A user close stays closed; plugin unload preserves the flag. The previous renderer-local flag is not migrated, so reopen the pane once after upgrading.
 - **PR list** — state pills, `+N / −N`, relative timestamps, **CI** (`passing / pending / failing`) and **review** (`approved / changes / required`) chips, exact `#N` search (`#42` does not match `#142`)
 - **Session chip + repo picker** — PR for the active session branch (same join as the core review pane); 32px pill with `https://github.com/{owner}.png` avatar
 - **PR / Issue header** — kicker, grouped meta chips, title glued to `#`, **Merge** action on open PRs (`squash / merge / rebase`, optional delete-branch, `GH_PROMPT_DISABLED=1`)
@@ -31,8 +32,6 @@ A single-file desktop plugin (`@hermes/plugin-sdk`) that shows your repository's
 - **Files** — unified hunks per file, line numbers, theme diff colors, `A/D/M/R` badge; unboxed header, border on the diff body
 - **Issues** — label chips in the label's own color, black/white text via W3C relative luminance
 - **Theme** — field surfaces on `--ui-editor-surface-background` (matte/glass inherited from Desktop); cards on `--ui-bg-quaternary`; container queries at `<360` / `<300` / `<240`
-
-- **Pane restore**: the open flag uses plugin-scoped `ctx.storage`. A user close stays closed; plugin unload preserves the flag. The previous renderer-local flag is not migrated, so reopen the pane once after upgrading.
 
 ## Requirements
 
@@ -58,7 +57,7 @@ The plugin **id** changed (`github-prs` → `githermes`), so the old install mus
 - Disk plugins load **uncompiled**: UI is written with `jsx()`/`jsxs()` calls, no JSX syntax, no build step.
 - Only `@hermes/plugin-sdk`, `react`, and `react/jsx-runtime` are importable.
 - Tailwind classes must already exist in the app's compiled CSS — arbitrary `var()` bracket forms (`bg-[var(--x)]`) are silently dead at runtime. Use the paren shorthand (`text-(--ui-text-tertiary)`) or scoped `<style>` blocks with real theme variables.
-- Large `gh` payloads go through `shBig` / `shJsonBig` (base64 chunks under the gateway stdout cap). Lists are capped at 30 rows by design.
+- Large `gh` payloads go through `shBig` / `shJsonBig` (hex chunks under the gateway stdout cap). Lists start at 30 rows and can grow to a 120-row cap.
 
 ## Status & contributing
 
