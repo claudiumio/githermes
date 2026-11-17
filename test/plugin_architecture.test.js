@@ -336,6 +336,16 @@ test('Session queries re-poll so opened/merged PRs surface without refocus', () 
   assert.equal((hook.match(/refetchInterval: MEDIUM_POLL_MS/g) || []).length, 3)
 })
 
+test('Issue #86: a failed detail header retries in place instead of forcing Back', () => {
+  const errorState = source.slice(source.indexOf('function DetailError'), source.indexOf('function CommentComposer'))
+  assert.ok(errorState.includes('{ title, error, onRetry }'), 'DetailError must forward the retry to the error state')
+  // Transient (offline, rate limit) failures are exactly what classifyGhError names.
+  const pr = source.slice(source.indexOf('function PrDetail'), source.indexOf('function IssueDetail'))
+  assert.ok(pr.includes('onRetry: () => headerQ.refetch()'), 'PR header retries its own query')
+  const issue = source.slice(source.indexOf('function IssueDetail'), source.indexOf('function SessionPrBanner'))
+  assert.ok(issue.includes('onRetry: () => q.refetch()'), 'issue header retries its own query')
+})
+
 test('Cross-repo session-PR navigation keeps the just-set selection', () => {
   const status = source.slice(source.indexOf('function SessionPrStatus'), source.indexOf('function SessionBranchStatus'))
   const banner = source.slice(source.indexOf('function SessionPrBanner'), source.indexOf('function useGitHubShellState'))

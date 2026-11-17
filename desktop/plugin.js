@@ -3192,10 +3192,10 @@ function DetailLoading({ repo, number, onBack, backLabel }) {
   ] })
 }
 
-function DetailError({ repo, number, title, error, onBack, backLabel }) {
+function DetailError({ repo, number, title, error, onBack, backLabel, onRetry }) {
   return jsxs('div', { className: 'flex h-full flex-col', children: [
     jsx(DetailToolbar, { repo, number, onBack, backLabel }),
-    jsx('div', { className: 'p-6', children: jsx(GhErrorState, { title, error }) }),
+    jsx('div', { className: 'p-6', children: jsx(GhErrorState, { title, error, onRetry }) }),
   ] })
 }
 
@@ -3412,7 +3412,7 @@ function PrDetail({ repo, number, onBack, active = true }) {
 
   const d = headerQ.data
   if (headerQ.isLoading) return jsx(DetailLoading, { repo, number, onBack, backLabel: 'Back to pull requests' })
-  if (headerQ.isError) return jsx(DetailError, { repo, number, title: 'Could not load pull request', error: headerQ.error, onBack, backLabel: 'Back to pull requests' })
+  if (headerQ.isError) return jsx(DetailError, { repo, number, title: 'Could not load pull request', error: headerQ.error, onBack, backLabel: 'Back to pull requests', onRetry: () => headerQ.refetch() })
   if (!d) return null
 
   const url = d.html_url || `https://github.com/${repo}/pull/${d.number}`
@@ -3529,7 +3529,7 @@ function IssueDetail({ repo, number, onBack, active = true }) {
   })
   const d = q.data
   if (q.isLoading) return jsx(DetailLoading, { repo, number, onBack, backLabel: 'Back to issues' })
-  if (q.isError) return jsx(DetailError, { repo, number, title: 'Could not load issue', error: q.error, onBack, backLabel: 'Back to issues' })
+  if (q.isError) return jsx(DetailError, { repo, number, title: 'Could not load issue', error: q.error, onBack, backLabel: 'Back to issues', onRetry: () => q.refetch() })
   if (!d) return null
   return jsxs('div', {
     className: 'gh-detail-root flex h-full min-h-0 flex-col overflow-hidden',
