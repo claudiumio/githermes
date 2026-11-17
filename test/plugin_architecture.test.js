@@ -348,9 +348,8 @@ test('Cross-repo session-PR navigation keeps the just-set selection', () => {
   assert.ok(shell.includes("$listQuery.set('')"), 'the shared filter resets on every repo change, navigation included')
 })
 
-test('Host PR chips route through the chat-link interceptor', () => {
-  const handler = source.slice(source.indexOf('function onChatLinkClick('), source.indexOf('function useRepos('))
-  assert.ok(handler.includes("closest('button[data-pr-link]')"), 'PR chip selector missing')
-  assert.ok(handler.includes('prTagUrl(chip)'), 'chip url must come from prTagUrl')
-  assert.ok(handler.indexOf("closest('.githermes-pane')") < handler.indexOf('prTagUrl(chip)'), 'own pane excluded first')
+test('Host PR links remain owned by the host', () => {
+  assert.ok(!source.includes('__reactFiber'))
+  assert.ok(!source.includes('data-pr-link'))
+  assert.ok(!source.includes('onChatLinkClick'))
 })

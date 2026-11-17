@@ -21,7 +21,7 @@ const files = {
     main: './index.js',
   },
   'node_modules/@hermes/plugin-sdk/index.js': `export const host = { state: { activeSessionId: {} }, request: async () => ({ code: 0, stdout: '' }) }
-export const atom = (init) => ({ get: () => init, set: () => {} })
+export const atom = (init) => ({ get: () => init, set: value => { init = value } })
 export const useValue = () => null
 export const useQuery = () => ({ isLoading: false, isError: false, data: null })
 export const useMutation = () => ({ mutate: () => {}, isPending: false, error: null })

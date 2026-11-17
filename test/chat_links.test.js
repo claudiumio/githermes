@@ -1,18 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { parseGithubLink, linkNavigationPlan, shouldInterceptClick, resolveRepoReset, prTagUrl } from '../desktop/plugin.js'
-
-test("prTagUrl reads the host PR chip's url from its React fiber ancestors", () => {
-  const url = 'https://github.com/a/b/pull/7'
-  const prTag = { memoizedProps: { pr: { number: 7, url } }, return: { memoizedProps: { session: {} }, return: null } }
-  let fiber = prTag
-  for (let i = 0; i < 12; i++) fiber = { memoizedProps: { asChild: true }, return: fiber } // Tip / Radix wrappers
-  const button = { __reactFiber$x1y2: { memoizedProps: { 'data-pr-link': true }, return: fiber } }
-  assert.equal(prTagUrl(button), url)
-  assert.equal(prTagUrl(button, 5), null, 'bounded walk')
-  assert.equal(prTagUrl({}), null, 'no fiber, host keeps the click')
-  assert.equal(prTagUrl({ __reactFiber$z: { memoizedProps: {}, return: null } }), null)
-})
+import { parseGithubLink, linkNavigationPlan, resolveRepoReset } from '../desktop/plugin.js'
 
 test('parseGithubLink maps PR / issue / repo links and rejects everything else', () => {
   const cases = [
@@ -27,6 +15,13 @@ test('parseGithubLink maps PR / issue / repo links and rejects everything else',
     ['https://github.com/a/b/blob/main/x.js', null],
     ['https://github.com/a/b/commit/abc', null],
     ['https://github.com/a/b/pull/0', null],
+    ['https://github.com/a/b/pull/9007199254740992', null],
+    ['https://github.com/a/b/issues/9007199254740992', null],
+    ['javascript://github.com/a/b', null],
+    ['ftp://github.com/a/b', null],
+    ['https://user:password@github.com/a/b', null],
+    ['https://github.com:444/a/b', null],
+    ['https://github.com/a/b/pull/9007199254740991', { repo: 'a/b', kind: 'pr', number: 9007199254740991 }],
     ['https://github.com/a/b/pull/abc', null],
     ['https://github.com/someone', null],
     ['https://github.com/orgs/NousResearch/people', null],
@@ -43,14 +38,6 @@ test('linkNavigationPlan selects the right tab and item', () => {
   assert.deepEqual(linkNavigationPlan({ kind: 'issue', number: 9 }), { tab: 'issues', selPr: null, selIssue: 9 })
   assert.deepEqual(linkNavigationPlan({ kind: 'issues' }), { tab: 'issues', selPr: null, selIssue: null })
   assert.deepEqual(linkNavigationPlan({ kind: 'repo' }), { tab: 'prs', selPr: null, selIssue: null })
-})
-
-test('modifier and non-primary clicks are left to the browser', () => {
-  const base = { defaultPrevented: false, button: 0, metaKey: false, ctrlKey: false, shiftKey: false, altKey: false }
-  assert.equal(shouldInterceptClick(base), true)
-  for (const k of ['metaKey', 'ctrlKey', 'shiftKey', 'altKey']) assert.equal(shouldInterceptClick({ ...base, [k]: true }), false, k)
-  assert.equal(shouldInterceptClick({ ...base, button: 1 }), false)
-  assert.equal(shouldInterceptClick({ ...base, defaultPrevented: true }), false)
 })
 
 test('a cross-repo link keeps its selection once, then a later return to that repo resets', () => {
