@@ -32,7 +32,7 @@ test('Paginated REST walks are capped and newest-first for comments', () => {
 
 test('Issue #34: polling is tiered, focus-aware and paused with the pane', () => {
   assert.equal((source.match(/refetchIntervalInBackground/g) || []).length, 0)
-  assert.equal((source.match(/refetchOnWindowFocus: true/g) || []).length, 8)
+  assert.equal((source.match(/refetchOnWindowFocus: true/g) || []).length, 9)
   assert.ok(source.includes("refetchInterval: q => livePollInterval(headerQ.data, { kind: 'checks', checks: q.state.data })"))
   assert.equal((source.match(/livePollInterval\(headerQ\.data, \{ kind: 'slow' \}\)/g) || []).length, 2)
   // The pane can be registered as a workspace tile (openWorkspace) or the plain
@@ -119,7 +119,7 @@ test('Issue #31: pane and page wire the shared list keyboard flow', () => {
 
 test('Issue #30: list filter tokens keep row and token actions separate', () => {
   const lists = source.slice(source.indexOf('function PrList'), source.indexOf('function DetailToolbar'))
-  assert.equal((lists.match(/jsxs\('div', \{\n\s+onClick: \(\) => onOpen\(/g) || []).length, 2)
+  assert.equal((lists.match(/jsxs\('div', \{\r?\n\s+onClick: \(\) => onOpen\(/g) || []).length, 2)
   assert.equal((lists.match(/className: 'gh-row-open/g) || []).length, 2)
   assert.ok(lists.includes("setListFilter(event, 'author', pr.author?.login)"))
   assert.ok(lists.includes("setListFilter(event, 'label', l.name)"))
@@ -331,9 +331,28 @@ test('Merged transcript PRs unlink: session falls back until the next PR', () =>
   assert.ok(hook.includes('resolveTranscriptPr(r?.messages'), 'histQ delegates the scan to the tested helper')
 })
 
+test('Issue #86: DetailError passes onRetry into GhErrorState for PR and issue headers', () => {
+  const detailError = source.slice(source.indexOf('function DetailError'), source.indexOf('function CommentComposer'))
+  assert.ok(detailError.includes('onRetry'), 'DetailError accepts onRetry')
+  assert.ok(detailError.includes('jsx(GhErrorState, { title, error, onRetry })'), 'GhErrorState receives onRetry')
+  assert.ok(source.includes("onRetry: () => headerQ.refetch()"), 'PR header wires headerQ.refetch')
+  assert.ok(source.includes("onRetry: () => q.refetch()"), 'Issue header wires q.refetch')
+})
+
+test('Issue #84: histQ stops polling after the first settled scan', () => {
+  const hook = source.slice(source.indexOf('const histQ = useQuery'), source.indexOf('function StateDot'))
+  assert.ok(hook.includes('SLOW_POLL_MS'), 'histQ uses the slow tier while unsettled')
+  assert.ok(hook.includes("query.state.status === 'success' ? false"), 'histQ disables interval after success')
+  assert.ok(hook.includes('refetchOnWindowFocus: true'), 'histQ still revalidates on focus')
+  assert.ok(!/refetchInterval:\s*MEDIUM_POLL_MS/.test(hook), 'histQ no longer polls at medium forever')
+})
+
+
 test('Session queries re-poll so opened/merged PRs surface without refocus', () => {
   const hook = source.slice(source.indexOf('function useSessionGit'), source.indexOf('function StateDot'))
-  assert.equal((hook.match(/refetchInterval: MEDIUM_POLL_MS/g) || []).length, 3)
+  // Issue #84: histQ no longer polls at MEDIUM forever; branch/status keep the medium tier.
+  assert.equal((hook.match(/refetchInterval: MEDIUM_POLL_MS/g) || []).length, 2)
+  assert.ok(hook.includes("query.state.status === 'success' ? false"), 'histQ settles after one scan')
 })
 
 test('Cross-repo session-PR navigation keeps the just-set selection', () => {
